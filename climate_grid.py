@@ -1,6 +1,8 @@
 import warnings
 warnings.filterwarnings('ignore')
 
+from clima import ClimaException
+import pickle
 import multiprocessing as mp
 from tqdm import tqdm
 import os
@@ -61,9 +63,19 @@ CLIMATE_MODEL = utils.AdiabatClimateRobust(
 CLIMATE_MODEL.verbose = False
 
 def model(x):
-    log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4 = x
-
     c = CLIMATE_MODEL
+
+    P_i = x_to_Pi(x, c)
+
+    # Compute climate
+    converged = c.RCE_robust(P_i)
+
+    result = make_result(x, c, converged)
+
+    return result
+
+def x_to_Pi(x, c):
+    log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4 = x
     P_i = np.ones(len(c.species_names))*1e-10
     P_i[c.species_names.index('H2O')] = 270.0
     P_i[c.species_names.index('N2')] = 10.0**log10PN2
@@ -73,10 +85,9 @@ def model(x):
     P_i[c.species_names.index('H2')] = 10.0**log10PH2
     P_i[c.species_names.index('CH4')] = 10.0**log10PCH4
     P_i *= 1.0e6 # convert to dynes/cm^2
+    return P_i
 
-    # Compute climate
-    converged = c.RCE_robust(P_i)
-
+def make_result(x, c, converged):
     # Save the P-z-T profile
     P = np.append(c.P_surf,c.P)
     z = np.append(0,c.z)
@@ -107,8 +118,79 @@ def get_gridvals():
     gridvals = (log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
     return gridvals
 
+def fix_climate_grid(filename, outfile):
+
+    c = CLIMATE_MODEL
+
+    res = []
+    i = 0
+    with open(filename,'rb') as f:
+        while True:
+            try:
+                tmp = pickle.load(f)
+                res.append(tmp)
+            except EOFError:
+                break
+
+    # Find failed runs 
+    failed = []
+    for i in range(len(res)):
+        val = res[i]
+        if not val[2]['converged']:
+            failed.append(val)
+
+    # Fix the failed runs
+    fixed = []
+    for i,val in enumerate(failed):
+        print('Working on failed %i'%i)
+        for perturb in [-1,1,-2,2,-3,3]:
+            converged = False
+            for j in range(len(res)):
+                if res[j][0] == val[0]+perturb and res[j][2]['converged']:
+                    # Run model that worked
+                    model(res[j][1])
+
+                    # Now run model that didn't work with initial conditions
+                    # from nearby one that did work. 
+                    P_i = x_to_Pi(val[1], c)
+                    try:
+                        converged = c.RCE(P_i, c.T_surf, c.T, c.convecting_with_below)
+                    except ClimaException:
+                        converged = False
+                    break
+            if converged:
+                break
+            
+        result = make_result(val[1], c, converged)
+        fixed.append((val[0],val[1],result))
+        print(converged)
+
+    res_new = []
+    for val in res:
+        if val[2]['converged']:
+            res_new.append(val)
+        else:
+            found = False
+            for val1 in fixed:
+                if val1[0] == val[0]:
+                    found = True
+                    replace = val1
+            
+            if not found:
+                raise Exception()
+
+            res_new.append(replace)
+
+    with open(outfile, 'wb') as f:
+        pass
+
+    for val in res_new:
+        with open(outfile, 'ab') as f:
+            pickle.dump(val,f)
+
 if __name__ == "__main__":
     filename = 'results/climate_v1.pkl' # Specify output filename
     ncores = 4 # Specify number of cores
     gridvals = get_gridvals()
     main(gridvals, filename, ncores)
+    fix_climate_grid(filename, 'results/climate_fixed_v1.pkl')
