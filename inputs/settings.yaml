@@ -1,0 +1,37 @@
+
+atmosphere-grid:
+  bottom: 0.0 # cm
+  top: atmospherefile # cm
+  number-of-layers: 100
+
+planet:
+  planet-mass: 4.132740e+27 # 0.692x Earth mass (grams) Agol et al. (2021)
+  planet-radius: 5.867852e+08 # 0.920x Earth Radius (cm) Agol et al. (2021)
+  surface-albedo: 0.1
+  solar-zenith-angle: 60.0 # degrees
+  hydrogen-escape: {type: diffusion limited}
+  water: {fix-water-in-troposphere: off, gas-rainout: off, water-condensation: off}
+
+particles:
+- {name: H2Oaer, RH-condensation: 0.5}
+
+boundary-conditions:
+# Several boundary conditions following Ranjan et al. (2023), ApJ
+- name: O3
+  lower-boundary: {type: vdep, vdep: 0.4}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: H2CO
+  lower-boundary: {type: vdep, vdep: 0.1}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: NH3
+  lower-boundary: {type: vdep, vdep: 1}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: C2H6
+  lower-boundary: {type: vdep, vdep: 1.0e-5}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: HCN
+  lower-boundary: {type: vdep, vdep: 7.0e-3}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: HCCCN
+  lower-boundary: {type: vdep, vdep: 7.0e-3}
+  upper-boundary: {type: veff, veff: 0.0}
