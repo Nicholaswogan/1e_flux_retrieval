@@ -237,7 +237,7 @@ class EvoAtmosphereRobust(EvoAtmosphere):
         self.set_surface_pressures(Pi)
         self.initialize_to_PT(P, T, Kzz, mix)
 
-    def set_particle_raddii(self, radii):
+    def set_particle_radii(self, radii):
         particle_radius = self.var.particle_radius
         for key in radii:
             ind = self.dat.species_names.index(key)
@@ -362,6 +362,26 @@ class EvoAtmosphereRobust(EvoAtmosphere):
                     (rdat.total_step_counter, self.wrk.longdy, max_dT, max_dlog10edd, TOA_pressure/1e6))
                 
         return give_up, reached_steady_state
+    
+    def find_steady_state(self):
+        """Attempts to find a photochemical steady state.
+
+        Returns
+        -------
+        bool
+            If True, then the routine was successful.
+        """    
+
+        self.initialize_robust_stepper(self.wrk.usol)
+        success = True
+        while True:
+            give_up, reached_steady_state = self.robust_step()
+            if reached_steady_state:
+                break
+            if give_up:
+                success = False
+                break
+        return success
 
 @nb.experimental.jitclass()
 class TempPressMubar:
