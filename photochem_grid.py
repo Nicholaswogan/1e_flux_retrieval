@@ -86,6 +86,7 @@ def make_photochemical_model():
         'HCaer2': 1.0e-4,
         'HCaer3': 1.0e-4,
     })
+    pc.rdat.max_total_step = 50_000
     pc.rdat.verbose = False
     return pc
 
@@ -139,6 +140,7 @@ def make_result(y, pc, converged):
         result[sp] = sol[sp].astype(np.float32)
     result['BOA flux'] = surf
     result['TOA flux'] = top
+    result['max time'] = pc.rdat.max_time
 
     return result
 
