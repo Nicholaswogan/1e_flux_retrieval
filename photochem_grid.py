@@ -132,6 +132,7 @@ def make_result(y, pc, converged):
         top[key] = top[key].astype(np.float32)
 
     result = {}
+    result['converged'] = converged
     result['x'] = y.astype(np.float32)
     result['P'] = P.astype(np.float32)
     result['z'] = z.astype(np.float32)
