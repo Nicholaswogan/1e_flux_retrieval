@@ -3,6 +3,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 import multiprocessing as mp
+import pickle
 from tqdm import tqdm
 import os
 import numpy as np
@@ -24,8 +25,19 @@ def main(gridvals, filename, ncores):
     inputs = grid_utils.get_inputs(gridvals) # get inputs
 
     # Exception if the file already exists
+    inds = []
     if os.path.isfile(filename):
-        raise Exception(filename+' already exists!')
+        with open(filename,'rb') as f:
+            while True:
+                try:
+                    tmp = pickle.load(f)
+                    ind = tmp[0]
+                    x = tmp[1]
+                    assert np.all(np.isclose(inputs[ind,:], x))
+                    inds.append(ind)
+                except EOFError:
+                    break
+        print('Number of calculations already completed: %i. Restarting calculation.'%(len(inds)))
     else:
         if not os.path.isfile(filename):
             with open(filename, 'wb') as f:
@@ -41,6 +53,8 @@ def main(gridvals, filename, ncores):
         # Fire off workers
         jobs = []
         for i in range(inputs.shape[0]):
+            if i in inds:
+                continue
             x = inputs[i,:]
             job = pool.apply_async(worker, (i, x, q))
             jobs.append(job)
@@ -86,7 +100,7 @@ def make_photochemical_model():
         'HCaer2': 1.0e-4,
         'HCaer3': 1.0e-4,
     })
-    pc.rdat.max_total_step = 50_000
+    pc.rdat.max_total_step = 10_000
     pc.rdat.verbose = False
     return pc
 
