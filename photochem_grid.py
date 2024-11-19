@@ -67,14 +67,12 @@ def main(gridvals, filename, ncores):
         q.put('kill')
 
 def get_gridvals():
-    log10PN2 = np.array([-1.0, 0.0])
     log10PCO2 = np.arange(-5,1.01,1)
     log10PO2 = np.arange(-7,1.01,2)
     log10PCO = np.arange(-7,1.01,2)
     log10PH2 = np.arange(-6,0.01,2)
     log10PCH4 = np.arange(-7,1.01,1)
-    log10Kzz = np.array([4.0, 5.0, 6.0])
-    gridvals = (log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4,log10Kzz)
+    gridvals = (log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
     return gridvals
 
 def make_climate_interpolators():
@@ -110,7 +108,10 @@ PHOTOCHEMICAL_MODEL = make_photochemical_model()
 def model(y):
     pc = PHOTOCHEMICAL_MODEL
 
-    log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4,log10Kzz = y
+    log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4 = y
+
+    log10PN2 = 0.0
+    log10Kzz = 5.0
 
     x1 = (log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
     ind = -4
@@ -169,7 +170,7 @@ def x_to_press(x):
     return Pi
 
 if __name__ == "__main__":
-    filename = 'results/photochem_v1.pkl'
+    filename = 'results/photochem_v1.1.pkl'
     ncores = 4
     gridvals = get_gridvals()
     main(gridvals, filename, ncores)
