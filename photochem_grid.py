@@ -67,11 +67,12 @@ def main(gridvals, filename, ncores):
         q.put('kill')
 
 def get_gridvals():
-    log10PCO2 = np.arange(-5,1.01,1)
+    log10PCO2 = np.append([-9,-7],np.arange(-5,1.01,1))
     log10PO2 = np.arange(-7,1.01,2)
     log10PCO = np.arange(-7,1.01,2)
     log10PH2 = np.arange(-6,0.01,2)
     log10PCH4 = np.arange(-7,1.01,1)
+    log10PCH4 = np.append([-11,-9],log10PCH4)
     gridvals = (log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
     return gridvals
 
@@ -83,7 +84,7 @@ def make_climate_interpolators():
     MIX = {}
     species = ['H2O','CO2','N2','O2','CO','H2','CH4']
     for sp in species:
-        MIX[sp] = g.make_array_interpolator(sp,logspace=True)
+        MIX[sp] = g.make_array_interpolator(sp,logspace=False)
     return PRESS, TEMP, MIX
 
 def make_photochemical_model():
@@ -113,15 +114,27 @@ def model(y):
     log10PN2 = 0.0
     log10Kzz = 5.0
 
-    x1 = (log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
+    species = ['N2','CO2','O2','CO','H2','CH4']
+    min_vals = [-1, -5, -7, -7, -6, -7]
+    x1 = np.array([log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4])
+    P_surf = np.sum([10.0**a for a in x1])
+    x2 = np.array([np.maximum(x1[i],min_vals[i]) for i in range(len(x1))])
     ind = -4
     
     # P-T-mix profile from climate model
-    P = PRESS(x1)[:ind]
-    T = TEMP(x1)[:ind]
+    P = PRESS(x2)[:ind]
+    T = TEMP(x2)[:ind]
     mix = {}
     for key in MIX:
-        mix[key] = MIX[key](x1)[:ind]
+        mix[key] = MIX[key](x2)[:ind]
+    for i,sp in enumerate(species):
+        if x1[i] < x2[i]:
+            mix[sp] = np.ones(mix[sp].shape[0])*((10.0**x1[i])/P_surf)
+    ftot = np.zeros(P.shape[0])
+    for key in mix:
+        ftot += mix[key]
+    for key in mix:
+        mix[key] /= ftot
 
     # Constant Kzz
     Kzz = np.ones(P.shape[0])*10.0**log10Kzz
@@ -170,7 +183,7 @@ def x_to_press(x):
     return Pi
 
 if __name__ == "__main__":
-    filename = 'results/photochem_v1.1.pkl'
+    filename = 'results/photochem_v1.2.pkl'
     ncores = 4
     gridvals = get_gridvals()
     main(gridvals, filename, ncores)

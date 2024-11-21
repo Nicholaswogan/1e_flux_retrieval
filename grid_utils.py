@@ -35,7 +35,7 @@ class GridInterpolator():
             for i,r in enumerate(self.results):
                 val[i] = r[key][j]
             if logspace:
-                val = np.log10(val)
+                val = np.log10(np.maximum(val,2e-38))
             interp = interpolate.RegularGridInterpolator(self.gridvals, val.reshape(self.gridshape))
             interps.append(interp)
 
@@ -49,6 +49,27 @@ class GridInterpolator():
         
         return interp_arr
     
+    def make_value_interpolator(self, key1, key2=None, logspace=False):
+        val = np.empty(len(self.results))
+
+        if key2 is None:
+            for i,r in enumerate(self.results):
+                val[i] = r[key1]
+        else:
+            for i,r in enumerate(self.results):
+                val[i] = r[key1][key2]
+        if logspace:
+            val = np.log10(np.maximum(val,2e-38))
+        interp = interpolate.RegularGridInterpolator(self.gridvals, val.reshape(self.gridshape))
+
+        def interp1(vals):
+            out = interp(vals)[0]
+            if logspace:
+                out = 10.0**out
+            return out
+        
+        return interp1
+        
 def listener(q, filename):
 
     while True:
