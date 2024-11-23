@@ -179,16 +179,22 @@ def prism_10trans():
 
     return data_dict
 
-LOGLIKE = make_loglike(prism_10trans())
-
 # mpiexec -n 4 python -m mpi4py retrievals.py
 
 if __name__ == '__main__':
     log_dir = 'ultranest/prism_10trans/'
     outfile = log_dir+'prism_10trans.pkl'
-
     if not os.path.isdir(log_dir): 
         os.mkdir(log_dir)
+
+    # DATA_DICT = prism_10trans()
+    # with open(log_dir+'data.pkl','wb') as f:
+    #     pickle.dump(DATA_DICT,f)
+
+    with open(log_dir+'data.pkl','rb') as f:
+        DATA_DICT = pickle.dump(f)
+
+    LOGLIKE = make_loglike(DATA_DICT)
     sampler = ultranest.ReactiveNestedSampler(
         PARAM_NAMES,
         LOGLIKE,
