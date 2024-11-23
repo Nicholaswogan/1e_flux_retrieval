@@ -179,6 +179,7 @@ def prism_10trans():
 
     return data_dict
 
+# export HDF5_USE_FILE_LOCKING="FALSE"
 # mpiexec -n 4 python -m mpi4py retrievals.py
 
 if __name__ == '__main__':
