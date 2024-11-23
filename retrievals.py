@@ -192,7 +192,7 @@ if __name__ == '__main__':
     #     pickle.dump(DATA_DICT,f)
 
     with open(log_dir+'data.pkl','rb') as f:
-        DATA_DICT = pickle.dump(f)
+        DATA_DICT = pickle.load(f)
 
     LOGLIKE = make_loglike(DATA_DICT)
     sampler = ultranest.ReactiveNestedSampler(
