@@ -66,6 +66,15 @@ def main(gridvals, filename, ncores):
         # Kill the listener
         q.put('kill')
 
+def get_gridvals_v1_1():
+    log10PCO2 = np.arange(-5,1.01,1)
+    log10PO2 = np.arange(-7,1.01,2)
+    log10PCO = np.arange(-7,1.01,2)
+    log10PH2 = np.arange(-6,0.01,2)
+    log10PCH4 = np.arange(-7,1.01,1)
+    gridvals = (log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
+    return gridvals
+
 def get_gridvals():
     log10PCO2 = np.append([-9,-7],np.arange(-5,1.01,1))
     log10PO2 = np.arange(-7,1.01,2)
