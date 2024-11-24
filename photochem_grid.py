@@ -75,13 +75,22 @@ def get_gridvals_v1_1():
     gridvals = (log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
     return gridvals
 
-def get_gridvals():
+def get_gridvals_v1_2():
     log10PCO2 = np.append([-9,-7],np.arange(-5,1.01,1))
     log10PO2 = np.arange(-7,1.01,2)
     log10PCO = np.arange(-7,1.01,2)
     log10PH2 = np.arange(-6,0.01,2)
     log10PCH4 = np.arange(-7,1.01,1)
     log10PCH4 = np.append([-11,-9],log10PCH4)
+    gridvals = (log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
+    return gridvals
+
+def get_gridvals():
+    log10PCO2 = np.append([-9,-7],np.arange(-5,1.01,1))
+    log10PO2 = np.append([-15,-11],np.arange(-7,1.01,2))
+    log10PCO = np.append([-11],np.arange(-7,1.01,2))
+    log10PH2 = np.append([-9],np.arange(-6,0.01,2))
+    log10PCH4 = np.append([-11,-9],np.arange(-7,1.01,1))
     gridvals = (log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
     return gridvals
 
@@ -192,7 +201,7 @@ def x_to_press(x):
     return Pi
 
 if __name__ == "__main__":
-    filename = 'results/photochem_v1.2.pkl'
+    filename = 'results/photochem_v1.3.pkl'
     ncores = 4
     gridvals = get_gridvals()
     main(gridvals, filename, ncores)
