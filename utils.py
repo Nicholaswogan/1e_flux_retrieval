@@ -641,9 +641,9 @@ def make_haze_opacity_file(pressure, cols, particle_radius, outfile):
                 f.write(fmt.format('%e'%(out[key][i])))
             f.write('\n')
 
-def make_picaso_cloud(press_interp, temp_interp, alt_interp, particles_interp, x, outfile):
-
-    P = press_interp(x)
+def make_picaso_cloud(P, temp_interp, alt_interp, particles_interp, x, outfile):
+    
+    # P = press_interp(x)
     T = temp_interp(x)
     z = alt_interp(x)
 

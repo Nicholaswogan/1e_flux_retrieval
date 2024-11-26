@@ -5,6 +5,9 @@ import os
 import numpy as np
 import pandas as pd
 import ultranest
+import tempfile
+from clima import rebin_with_errors
+from photochem.utils import stars
 import pickle
 from threadpoolctl import threadpool_limits
 _ = threadpool_limits(limits=1)
@@ -26,7 +29,7 @@ import planets
 
 def make_interpolators():
     filename = 'results/photochem_v1.2.pkl'
-    gridvals = photochem_grid.get_gridvals()
+    gridvals = photochem_grid.get_gridvals_v1_2()
     g = grid_utils.GridInterpolator(filename, gridvals)
 
     pc = photochem_grid.PHOTOCHEMICAL_MODEL
@@ -69,9 +72,9 @@ def make_picaso():
     )
     return p
 
-def make_picaso_atm(x, species=None):
+def make_atm(x, species=None):
     atm = {}
-    atm['pressure'] = PRESS(x)/1e6
+    atm['pressure'] = PRESS(x)
     atm['temperature'] = TEMP(x)
     if species is None:
         species = list(MIX.keys())
@@ -81,6 +84,12 @@ def make_picaso_atm(x, species=None):
         ftot += atm[key]
     for key in species:
         atm[key] /= ftot
+    atm['pressure'] *= ftot # this seems to be a good thing to do
+    return atm
+
+def make_picaso_atm(x, species=None):
+    atm = make_atm(x, species=species)
+    atm['pressure'] /= 1e6 # bars
     for key in atm:
         atm[key] = atm[key][::-1].copy()
     atm = pd.DataFrame(atm)
@@ -116,6 +125,33 @@ def model(y, wavl, **kwargs):
 
     # Compute spectrum
     _, rprs2 = p.rprs2(atm, wavl=wavl, log10Pcloudbottom=log10Psurf, dlog10Pcloud=dlog10Pcloud, **kwargs)
+
+    # Add the offset
+    rprs2 += offset
+
+    return rprs2
+
+def model_haze(y, wavl, clouds=True, **kwargs):
+    p = PICASO
+
+    log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4,log10Pcloud,offset = y
+
+    # Atmosphere
+    x = (log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
+    atm = make_picaso_atm(x, PICASO_SPECIES)
+
+    # Clouds.
+    with tempfile.NamedTemporaryFile('w') as f:
+        p.clouds_reset()
+        P_tmp = atm['pressure'].to_numpy()[::-1].copy()*1e6 # pressure in dynes/cm^2
+        utils.make_picaso_cloud(P_tmp, TEMP, ALT, PARTICLES, x, f.name)
+        f.flush()
+        
+        # Compute spectrum
+        cloud_filename = None
+        if clouds:
+            cloud_filename = f.name
+        _, rprs2 = p.rprs2(atm, wavl=wavl, cloud_filename=cloud_filename, **kwargs)
 
     # Add the offset
     rprs2 += offset
@@ -179,32 +215,71 @@ def prism_10trans():
 
     return data_dict
 
+def prism_data(R=None, ntrans=1):
+
+    # 1 transit NIRSpec Prism
+    with open('data/prism.pkl','rb') as f:
+        data = pickle.load(f)
+
+    wavl = data['wavl']
+    err = data['err']
+    err = err/np.sqrt(ntrans)
+
+    if R is not None:
+        wavl_n = stars.grid_at_resolution(np.min(wavl), np.max(wavl), R)
+        _, err = rebin_with_errors(wavl.copy(), err.copy(), err.copy(), wavl_n.copy())
+        wavl = wavl_n
+
+    return wavl, err
+
+def make_data_dict_nominal_archean(ntrans):
+
+    wavl, err = prism_data(R=60, ntrans=ntrans)
+
+    # Results in 
+    # - F_CH4 = 1.122e11 molecules/cm^2/s = Modern biological flux
+    # - vdep_CO = 1.2e-4 cm/s = Plausible Archean Earth value
+    # - vdep_H2 = 2.4e-4 cm/s = Plausible Archean Earth value
+    # - T_surf = 295.6 K = Plausible Archean Earth value
+    # CO2, O2, CO, H2, CH4, cloud, offset
+    x = [-1.3, -7.0, -5.047337760474288, -4.629587714442045, -3.9278490111726203, -0.7, 0]
+    rprs2 = model(x, wavl)
+
+    data_dict = {
+        'wavl': wavl,
+        'rprs2': rprs2,
+        'err': err
+    }
+
+    return data_dict
+
 # export HDF5_USE_FILE_LOCKING="FALSE"
 # mpiexec -n 4 python -m mpi4py retrievals.py
 
 if __name__ == '__main__':
-    log_dir = 'ultranest/prism_10trans/'
-    outfile = log_dir+'prism_10trans.pkl'
-    if not os.path.isdir(log_dir): 
-        os.mkdir(log_dir)
+    tag = 'nominal_archean'
+    ntrans1 = [10, 20, 30]
+    
+    for ntrans in ntrans1:
+        log_dir = 'ultranest/'+tag+'_'+('%i_transits'%(ntrans))
+        print(log_dir)
+        if not os.path.isdir(log_dir): 
+            os.mkdir(log_dir)
 
-    # DATA_DICT = prism_10trans()
-    # with open(log_dir+'data.pkl','wb') as f:
-    #     pickle.dump(DATA_DICT,f)
+        DATA_DICT = make_data_dict_nominal_archean(ntrans)
+        with open(log_dir+'/data.pkl','wb') as f:
+            pickle.dump(DATA_DICT, f)
 
-    with open(log_dir+'data.pkl','rb') as f:
-        DATA_DICT = pickle.load(f)
-
-    LOGLIKE = make_loglike(DATA_DICT)
-    sampler = ultranest.ReactiveNestedSampler(
-        PARAM_NAMES,
-        LOGLIKE,
-        PRIOR,
-        log_dir=log_dir,
-        resume=True
-    )
-    result = sampler.run(min_num_live_points=400)
-    with open(outfile,'wb') as f:
-        pickle.dump(result, f)
+        LOGLIKE = make_loglike(DATA_DICT)
+        sampler = ultranest.ReactiveNestedSampler(
+            PARAM_NAMES,
+            LOGLIKE,
+            PRIOR,
+            log_dir=log_dir,
+            resume=True
+        )
+        result = sampler.run(min_num_live_points=400)
+        with open(log_dir+'/result.pkl','wb') as f:
+            pickle.dump(result, f)
 
 
