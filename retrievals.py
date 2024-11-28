@@ -72,6 +72,16 @@ def make_picaso():
     )
     return p
 
+def vdep(sp, x):
+    atm = make_atm(x)
+    P = retrievals.PRESS(y)
+    T = retrievals.TEMP(y)
+    Px = retrievals.MIX[sp](y)[0]*P[0]
+    k_boltz = const.k*1e7
+    den = Px/(k_boltz*T[0])
+    flux = (retrievals.FLUXES[sp](y))
+    return (-flux/den)
+
 def make_atm(x, species=None):
     atm = {}
     atm['pressure'] = PRESS(x)
@@ -237,12 +247,13 @@ def make_data_dict_nominal_archean(ntrans):
     wavl, err = prism_data(R=60, ntrans=ntrans)
 
     # Results in 
+    # - F_O2 = 0 molecules/cm^2/s
     # - F_CH4 = 1.122e11 molecules/cm^2/s = Modern biological flux
     # - vdep_CO = 1.2e-4 cm/s = Plausible Archean Earth value
     # - vdep_H2 = 2.4e-4 cm/s = Plausible Archean Earth value
     # - T_surf = 295.6 K = Plausible Archean Earth value
     # CO2, O2, CO, H2, CH4, cloud, offset
-    x = [-1.3, -7.0, -5.047337760474288, -4.629587714442045, -3.9278490111726203, -0.7, 0]
+    x = [-1.3, -10.871581355448443, -4.545687679567518, -4.237708570197399, -3.6130547980316687, -0.7, 0]
     rprs2 = model(x, wavl)
 
     data_dict = {
