@@ -28,8 +28,8 @@ import planets
 #     return gridvals
 
 def make_interpolators():
-    filename = 'results/photochem_v1.2.pkl'
-    gridvals = photochem_grid.get_gridvals_v1_2()
+    filename = 'results/photochem_v1.3.pkl'
+    gridvals = photochem_grid.get_gridvals()
     g = grid_utils.GridInterpolator(filename, gridvals)
 
     pc = photochem_grid.PHOTOCHEMICAL_MODEL
@@ -174,9 +174,9 @@ def quantile_to_uniform(quantile, lower_bound, upper_bound):
 def PRIOR(cube):
     params = cube.copy()
     params[0] = quantile_to_uniform(cube[0], -9, 1) # log10CO2
-    params[1] = quantile_to_uniform(cube[1], -7, 1) # log10O2
-    params[2] = quantile_to_uniform(cube[2], -7, 1) # log10CO
-    params[3] = quantile_to_uniform(cube[3], -6, 0) # log10H2
+    params[1] = quantile_to_uniform(cube[1], -15, 1) # log10O2
+    params[2] = quantile_to_uniform(cube[2], -11, 1) # log10CO
+    params[3] = quantile_to_uniform(cube[3], -9, 0) # log10H2
     params[4] = quantile_to_uniform(cube[4], -11, 1) # log10CH4
     params[5] = quantile_to_uniform(cube[5], -5, 0) # log10Pcloud (top)
     params[6] = quantile_to_uniform(cube[6], -1000e-6, 1000e-6) # offset
