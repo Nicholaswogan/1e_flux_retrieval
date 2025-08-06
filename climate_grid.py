@@ -74,11 +74,10 @@ def get_gridvals():
     return gridvals
 
 if __name__ == "__main__":
-    print(np.prod([len(x) for x in get_gridvals()]))
     # mpiexec -n X python climate_grid.py
-    # make_grid(
-    #     model_func=model, 
-    #     gridvals=get_gridvals(), 
-    #     filename='results/climate_v1.h5', 
-    #     progress_filename='results/climate_v1.log'
-    # )
+    make_grid(
+        model_func=model, 
+        gridvals=get_gridvals(), 
+        filename='results/climate_v1.h5', 
+        progress_filename='results/climate_v1.log'
+    )
