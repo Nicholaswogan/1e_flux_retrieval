@@ -46,9 +46,6 @@ def create_TRAPPIST1e_stellar_flux():
 
 def create_TRAPPIST1_flux_picaso():
 
-    if os.path.isfile('inputs/TRAPPIST1e_stellar_flux_picaso.txt'):
-        return
-
     url = 'http://archive.stsci.edu/hlsps/hazmat/hlsp_hazmat_phoenix_synthspec_trappist-1_1a_v1_fullres.fits'
     response = requests.get(url)
 
@@ -66,7 +63,7 @@ def create_TRAPPIST1_flux_picaso():
     out = np.empty((2,wv.shape[0]))
     out[0,:] = wv
     out[1,:] = F
-    np.savetxt('inputs/TRAPPIST1e_stellar_flux_picaso.txt', out.T)
+    np.savetxt('inputs/TRAPPIST1e_hazmat_picaso.txt', out.T)
 
 def main():
     create_zahnle_HNOC()
