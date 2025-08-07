@@ -63,10 +63,57 @@ class AdiabatClimateRobust(AdiabatClimate):
 
         return convecting_with_below_copy
     
+    def check_for_overconvection(self):
+        "Checks if we are in an overconvecting regime"
+
+        convecting_with_below = self.convecting_with_below
+        
+        # Compute the dT/dP
+        T = np.append(self.T_surf, self.T)
+        P = np.append(self.P_surf, self.P)
+        log10P = np.log10(P)
+        dT_dP = (T[1:] - T[:-1])/(log10P[1:] - log10P[:-1])
+        
+        # Find lowest convective zone
+        ind = -1
+        for i in range(len(convecting_with_below)):
+            if convecting_with_below[i]:
+                ind = i
+                break 
+        
+        # Return if no convective zones
+        if ind == -1:
+            return False, None
+        
+        # Find top of first convective zone
+        ind1 = -1
+        for i in range(ind,len(convecting_with_below)):
+            if not convecting_with_below[i]:
+                ind1 = i
+                break
+                
+        if ind1 == -1 and ind == 0:
+            # Whole atmosphere is convective then we assume overconvective
+            return True, None
+        if ind1 == -1 and ind != 0:
+            # Some convective zone above surface, then we assume it is OK.
+            return False, None
+        if ind1 == 0:
+            # Weird case where the top of the convective zone is
+            # the surface... seems impossible but we account for it anyway.
+            return False, None
+        
+        # Now look at the top of the convective zone
+        if dT_dP[ind1] < -10 and dT_dP[ind1-1] > 0:
+            # If there is a "kink" in the P-T profile then this is overconvection
+            return True, dT_dP[ind1]
+        else:
+            return False, None
+    
     def RCE_simple_guess(self, P_i, remove_conv_params=None):
 
         if remove_conv_params is None:
-            remove_conv_params = [0.5, 0.4, 0.3, 0.0]
+            remove_conv_params = [0.5, 0.3, 0.0]
 
         converged_simple = self.surface_temperature_robust(P_i)
         if not converged_simple:
@@ -76,7 +123,8 @@ class AdiabatClimateRobust(AdiabatClimate):
         # If simple climate model converged, then save the atmosphere
         T_surf_guess, T_guess, convecting_with_below_guess = self.T_surf, self.T, self.convecting_with_below
 
-        # We first try an initial convecting pattern with less
+        remove_conv_param_save = []
+        dT_dP_save = []
         for remove_conv_param in remove_conv_params:
 
             convecting_with_below_tmp = self.adjust_convecting_pattern(convecting_with_below_guess, remove_conv_param)
@@ -87,7 +135,37 @@ class AdiabatClimateRobust(AdiabatClimate):
                 converged = False
 
             if converged:
-                break
+                overconvecting, dT_dP = self.check_for_overconvection()
+                if dT_dP is not None:
+                    # Save reasonable failures
+                    remove_conv_param_save.append(remove_conv_param)
+                    dT_dP_save.append(dT_dP)
+                if not overconvecting:
+                    # Try other remove_conv_params to see if we
+                    # can get a case without overconvection.
+                    # Note that if the last one works, then 
+                    # the model will report converged, even if
+                    # overconvection is happening.
+                    break
+
+        if converged:
+            if overconvecting and len(dT_dP_save) > 0:
+                # If we made it here, then there are models that converged but all of
+                # them were overconvecting. So, we are going to pick the best one
+                # and stick with it.
+
+                ind = np.argmax(dT_dP_save) # corresponds to the smallist "kink"
+
+                if remove_conv_param == remove_conv_param_save[ind]:
+                    # The best one is the last one, so no work needed
+                    pass
+                else:
+                    # The best one is not the last one, so we must recompute
+                    convecting_with_below_tmp = self.adjust_convecting_pattern(convecting_with_below_guess, remove_conv_param_save[ind])
+                    try:
+                        converged = self.RCE(P_i, T_surf_guess, T_guess, convecting_with_below_tmp)
+                    except ClimaException:
+                        converged = False
 
         return converged
         
