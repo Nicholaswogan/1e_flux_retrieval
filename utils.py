@@ -113,7 +113,7 @@ class AdiabatClimateRobust(AdiabatClimate):
     def RCE_simple_guess(self, P_i, remove_conv_params=None):
 
         if remove_conv_params is None:
-            remove_conv_params = [0.5, 0.3, 0.0]
+            remove_conv_params = [0.5, 0.3, 0.2, 0.0]
 
         converged_simple = self.surface_temperature_robust(P_i)
         if not converged_simple:
@@ -192,7 +192,14 @@ class AdiabatClimateRobust(AdiabatClimate):
     
     def RCE_robust(self, P_i, remove_conv_params=None, T_guess_mid=None, T_perturbs=None):
 
-        # First try guess based on simple climate model
+        # First, we try a single isothermal case
+        converged = self.RCE_isotherm_guess(P_i, T_guess_mid, np.array([0.0]))
+        if converged:
+            overconvecting, _ = self.check_for_overconvection()
+            if not overconvecting:
+                return converged
+
+        # Try guess based on simple climate model
         converged = self.RCE_simple_guess(P_i, remove_conv_params)
         if converged:
             return converged
