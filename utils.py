@@ -46,20 +46,48 @@ class AdiabatClimateRobust(AdiabatClimate):
         
         return converged
     
-    def RCE_simple_guess(self, P_i):
+    def adjust_convecting_pattern(self, convecting_with_below, remove_conv_param):
+
+        convecting_with_below_copy = convecting_with_below.copy()
+
+        k = 0
+        num_to_switch = int(len(np.where(convecting_with_below_copy)[0])*remove_conv_param)
+        for i in range(len(convecting_with_below_copy)):
+            j = len(convecting_with_below_copy) - i - 1
+            if k >= num_to_switch:
+                break
+            
+            if convecting_with_below_copy[j]:
+                convecting_with_below_copy[j] = False
+                k += 1
+
+        return convecting_with_below_copy
+    
+    def RCE_simple_guess(self, P_i, remove_conv_params=None):
+
+        if remove_conv_params is None:
+            remove_conv_params = [0.5, 0.4, 0.3, 0.0]
 
         converged_simple = self.surface_temperature_robust(P_i)
         if not converged_simple:
             # If this fails, then we give up, returning no convergence
             return False
-        
+
         # If simple climate model converged, then save the atmosphere
         T_surf_guess, T_guess, convecting_with_below_guess = self.T_surf, self.T, self.convecting_with_below
-        
-        try:
-            converged = self.RCE(P_i, T_surf_guess, T_guess, convecting_with_below_guess)
-        except ClimaException:
-            converged = False
+
+        # We first try an initial convecting pattern with less
+        for remove_conv_param in remove_conv_params:
+
+            convecting_with_below_tmp = self.adjust_convecting_pattern(convecting_with_below_guess, remove_conv_param)
+            
+            try:
+                converged = self.RCE(P_i, T_surf_guess, T_guess, convecting_with_below_tmp)
+            except ClimaException:
+                converged = False
+
+            if converged:
+                break
 
         return converged
         
@@ -84,10 +112,10 @@ class AdiabatClimateRobust(AdiabatClimate):
 
         return converged
     
-    def RCE_robust(self, P_i, T_guess_mid=None, T_perturbs=None):
+    def RCE_robust(self, P_i, remove_conv_params=None, T_guess_mid=None, T_perturbs=None):
 
         # First try guess based on simple climate model
-        converged = self.RCE_simple_guess(P_i)
+        converged = self.RCE_simple_guess(P_i, remove_conv_params)
         if converged:
             return converged
 
