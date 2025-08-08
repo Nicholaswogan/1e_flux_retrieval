@@ -57,34 +57,34 @@ def make_photochemical_model(stellar_flux='inputs/TRAPPIST1e_hazmat.txt'):
 PRESS, TEMP, MIX, GRIDINTERPOLATOR = make_climate_interpolators()
 PHOTOCHEMICAL_MODEL = make_photochemical_model()
 
-def model(y):
+def model(x):
 
     pc = PHOTOCHEMICAL_MODEL
 
-    log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4 = y
-
-    # log10PN2 = 0.0
+    log10PN2 = 0.0
     log10Kzz = 5.0
 
-    # Species in order of climate grid
-    species = ['CO2','O2','CO','H2','CH4']
-    
-    x1 = np.array([log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4])
-    P_surf = np.sum([10.0**a for a in x1]) + 1.0 # + 1 for N2
+    # Parameters
+    species_var = ['CO2','O2','CO','H2','CH4']
+    log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4 = x
 
-    min_vals = GRIDINTERPOLATOR.min_gridvals
-    x2 = np.array([np.maximum(x1[i],min_vals[i]) for i in range(len(x1))])
+    # Species that we will fix at surface
+    species_bc = ['N2','CO2','O2','CO','H2','CH4']
+    x_bc = np.array([log10PN2,log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4])
+
+    # Rough surface P
+    P_surf = np.sum([10.0**a for a in x_bc])
     
     # P-T-mix profile from climate model
-    P = PRESS(x2)[:]
-    T = TEMP(x2)[:]
+    P = PRESS(x)[:]
+    T = TEMP(x)[:]
     mix = {}
     for key in MIX:
-        mix[key] = MIX[key](x2)[:]
+        mix[key] = MIX[key](x)[:]
     # Lower the mix if outside the climate grid.
-    for i,sp in enumerate(species):
-        if x1[i] < x2[i]:
-            mix[sp] = np.ones(mix[sp].shape[0])*((10.0**x1[i])/P_surf)
+    for i,sp in enumerate(species_var):
+        if x[i] < GRIDINTERPOLATOR.min_gridvals[i]:
+            mix[sp] = np.ones(mix[sp].shape[0])*((10.0**x[i])/P_surf)
     
     # Normalize
     ftot = np.zeros(P.shape[0])
@@ -97,12 +97,12 @@ def model(y):
     Kzz = np.ones(P.shape[0])*10.0**log10Kzz
 
     # Surface boundary conditions
-    Pi = x_to_press(species, x1) # dynes/cm^2
+    Pi = x_to_press(species_bc, x_bc) # dynes/cm^2
 
     pc.initialize_to_PT_bcs(P, T, Kzz, mix, Pi)
     converged = pc.find_steady_state_robust()
 
-    result = make_result(y, pc, converged)
+    result = make_result(x, pc, converged)
 
     return result
 
@@ -114,7 +114,7 @@ def x_to_press(species, x):
         Pi[key] = 1e6*10.0**x[i]
     return Pi
 
-def make_result(y, pc, converged):
+def make_result(x, pc, converged):
     P = pc.wrk.pressure
     z = pc.var.z
     T = pc.var.temperature
@@ -126,7 +126,7 @@ def make_result(y, pc, converged):
 
     result = {}
     result['converged'] = np.array(converged)
-    result['x'] = y.astype(np.float32)
+    result['x'] = x.astype(np.float32)
     result['P'] = P.astype(np.float32)
     result['z'] = z.astype(np.float32)
     result['T'] = T.astype(np.float32)
