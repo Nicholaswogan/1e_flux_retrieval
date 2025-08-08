@@ -239,6 +239,8 @@ class RobustData():
         self.nerrors = None
         self.max_time = None
         self.robust_stepper_initialized = None
+        # Surface pressures
+        self.Pi = None
 
 class EvoAtmosphereRobust(EvoAtmosphere):
 
@@ -263,6 +265,9 @@ class EvoAtmosphereRobust(EvoAtmosphere):
         self.var.autodiff = True
         self.var.atol = 1.0e-23
         self.var.equilibrium_time = 1e15
+
+        # Model state
+        self.max_time_state = None
 
         for i in range(len(self.var.cond_params)):
             self.var.cond_params[i].smooth_factor = 1
@@ -356,6 +361,7 @@ class EvoAtmosphereRobust(EvoAtmosphere):
         self.prep_atmosphere(self.wrk.usol)
 
     def initialize_to_PT_bcs(self, P, T, Kzz, mix, Pi):
+        self.rdat.Pi = Pi
         self.set_surface_pressures(Pi)
         self.initialize_to_PT(P, T, Kzz, mix)
 
@@ -379,6 +385,7 @@ class EvoAtmosphereRobust(EvoAtmosphere):
         rdat.total_step_counter = 0
         rdat.nerrors = 0
         rdat.max_time = 0
+        self.max_time_state = None
         self.initialize_stepper(usol)
         rdat.robust_stepper_initialized = True
 
@@ -413,17 +420,24 @@ class EvoAtmosphereRobust(EvoAtmosphere):
                 self.initialize_stepper(usol)
                 rdat.nerrors += 1
 
-                if rdat.nerrors > 10:
+                if rdat.nerrors > 15:
+                    give_up = True
+                    break
+
+            # Reset integrator if we get large magnitude negative numbers
+            if not self.healthy_atmosphere():
+                usol = np.clip(self.wrk.usol.copy(),a_min=1.0e-40,a_max=np.inf)
+                self.initialize_stepper(usol)
+                rdat.nerrors += 1
+
+                if rdat.nerrors > 15:
                     give_up = True
                     break
 
             # Update the max time achieved
-            rdat.max_time = np.maximum(rdat.max_time, self.wrk.tn)
-
-            # Reset integrator if we get large magnitude negative numbers
-            if np.min(self.wrk.mix_history[:,:,0]) < rdat.min_mix_reset:
-                usol = np.clip(self.wrk.usol.copy(),a_min=1.0e-40,a_max=np.inf)
-                self.initialize_stepper(usol)
+            if self.wrk.tn > rdat.max_time:
+                rdat.max_time = self.wrk.tn
+                self.max_time_state = self.model_state_to_dict() # save the model state
 
             # convergence checking
             converged = self.check_for_convergence()
@@ -504,6 +518,98 @@ class EvoAtmosphereRobust(EvoAtmosphere):
                 success = False
                 break
         return success
+    
+    def healthy_atmosphere(self):
+        return np.min(self.wrk.mix_history[:,:,0]) > self.rdat.min_mix_reset
+    
+    def find_steady_state_robust(self):
+
+        # Change some rdat settings
+        self.rdat.freq_update_atol = 100_000
+        self.rdat.max_total_step = 10_000
+
+        # First just try to get to steady-state with standard atol
+        self.var.atol = 1.0e-23
+        converged = self.find_steady_state()
+        if converged:
+            return converged
+
+        # Convergence did not happen. Save the max time state.
+        max_time = self.rdat.max_time
+        max_time_state = deepcopy(self.max_time_state)
+
+        # Lets try a couple different atols.
+        for atol in [1.0e-18, 1.0e-15]:
+            # Lets initialize to max time state
+            self.initialize_from_dict(max_time_state)
+            # Do some smaller number of steps
+            self.rdat.max_total_step = 5_000
+            self.var.atol = atol # set the atol
+            converged = self.find_steady_state() # Integrate
+            if converged:
+                # If converged then lets return
+                return converged
+
+            # No convergence. We re-save max time state
+            if self.rdat.max_time > max_time:
+                max_time = self.rdat.max_time
+                max_time_state = deepcopy(self.max_time_state)
+
+        # No convergence, we reinitialize to max time state and return
+        self.initialize_from_dict(max_time_state)
+
+        return converged
+        
+    def model_state_to_dict(self):
+        """Returns a dictionary containing all information needed to reinitialize the atmospheric
+        state. This dictionary can be used as an input to "initialize_from_dict".
+        """
+
+        if self.rdat.log10P_interp is None:
+            raise Exception('This routine can only be called after `initialize_to_PT_bcs`')
+
+        out = {}
+        out['rdat'] = deepcopy(self.rdat.__dict__)
+        out['top_atmos'] = self.var.top_atmos
+        out['temperature'] = self.var.temperature
+        out['edd'] = self.var.edd
+        out['usol'] = self.wrk.usol
+        out['particle_radius'] = self.var.particle_radius
+
+        # Other settings
+        out['equilibrium_time'] = self.var.equilibrium_time
+        out['verbose'] = self.var.verbose
+        out['atol'] = self.var.atol
+        out['autodiff'] = self.var.autodiff
+
+        return out
+
+    def initialize_from_dict(self, out):
+        """Initializes the model from a dictionary created by the "model_state_to_dict" routine.
+        """
+
+        for key, value in out['rdat'].items():
+            setattr(self.rdat, key, value)
+
+        self.update_vertical_grid(TOA_alt=out['top_atmos'])
+        self.set_temperature(out['temperature'])
+        self.var.edd = out['edd']
+        self.wrk.usol = out['usol']
+        self.var.particle_radius = out['particle_radius']
+        self.update_vertical_grid(TOA_alt=out['top_atmos'])
+
+        # Other settings
+        self.var.equilibrium_time = out['equilibrium_time']
+        self.var.verbose = out['verbose']
+        self.var.atol = out['atol']
+        self.var.autodiff = out['autodiff']
+        
+        # Now set boundary conditions
+        Pi = self.rdat.Pi
+        for sp in Pi:
+            self.set_lower_bc(sp, bc_type='press', press=Pi[sp])
+
+        self.prep_atmosphere(self.wrk.usol)
 
 @nb.experimental.jitclass()
 class TempPressMubar:
