@@ -16,22 +16,60 @@ particles:
 - {name: H2Oaer, RH-condensation: 0.5}
 
 boundary-conditions:
-# Several boundary conditions following Ranjan et al. (2023), ApJ
+# Follows Ranjan et al. (2023), ApJ
+- name: O
+  lower-boundary: {type: vdep, vdep: 1.0}
+  upper-boundary: {type: veff, veff: 0.0}
 - name: O3
   lower-boundary: {type: vdep, vdep: 0.4}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: OH
+  lower-boundary: {type: vdep, vdep: 1.0}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: HO2
+  lower-boundary: {type: vdep, vdep: 1.0}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: H2O2
+  lower-boundary: {type: vdep, vdep: 0.5}
   upper-boundary: {type: veff, veff: 0.0}
 - name: H2CO
   lower-boundary: {type: vdep, vdep: 0.1}
   upper-boundary: {type: veff, veff: 0.0}
-- name: NH3
-  lower-boundary: {type: vdep, vdep: 1}
+- name: HCO
+  lower-boundary: {type: vdep, vdep: 0.1}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: CH3O
+  lower-boundary: {type: vdep, vdep: 0.1}
   upper-boundary: {type: veff, veff: 0.0}
 - name: C2H6
   lower-boundary: {type: vdep, vdep: 1.0e-5}
   upper-boundary: {type: veff, veff: 0.0}
-- name: HCN
-  lower-boundary: {type: vdep, vdep: 7.0e-3}
+- name: NH3
+  lower-boundary: {type: vdep, vdep: 1.0}
   upper-boundary: {type: veff, veff: 0.0}
+- name: NO
+  lower-boundary: {type: vdep, vdep: 0.02}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: NO2
+  lower-boundary: {type: vdep, vdep: 0.02}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: NO3
+  lower-boundary: {type: vdep, vdep: 1.0}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: HNO2
+  lower-boundary: {type: vdep, vdep: 0.5}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: HNO3
+  lower-boundary: {type: vdep, vdep: 4.0}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: HCN
+  lower-boundary: {type: vdep, vdep: 0.01}
+  upper-boundary: {type: veff, veff: 0.0}
+- name: CN
+  lower-boundary: {type: vdep, vdep: 0.01}
+  upper-boundary: {type: veff, veff: 0.0}
+
+# Assumed to be the same as HCN
 - name: HCCCN
-  lower-boundary: {type: vdep, vdep: 7.0e-3}
+  lower-boundary: {type: vdep, vdep: 0.01}
   upper-boundary: {type: veff, veff: 0.0}

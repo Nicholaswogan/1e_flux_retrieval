@@ -5,6 +5,7 @@ import numba as nb
 from numba import types
 from scipy import integrate
 from scipy import constants as const
+from scipy import interpolate
 
 from photochem.clima import AdiabatClimate, ClimaException
 from photochem import EvoAtmosphere, PhotoException
@@ -308,6 +309,14 @@ class EvoAtmosphereRobust(EvoAtmosphere):
         rdat.log10P_interp = np.log10(P1.copy()[::-1])
         rdat.T_interp = T1.copy()[::-1]
         rdat.log10edd_interp = np.log10(Kzz1.copy()[::-1])
+        
+        # extrapolate to 1e6 bars
+        T_tmp = interpolate.interp1d(rdat.log10P_interp, rdat.T_interp, bounds_error=False, fill_value='extrapolate')(12)
+        edd_tmp = interpolate.interp1d(rdat.log10P_interp, rdat.log10edd_interp, bounds_error=False, fill_value='extrapolate')(12)
+        rdat.log10P_interp = np.append(rdat.log10P_interp, 12)
+        rdat.T_interp = np.append(rdat.T_interp, T_tmp)
+        rdat.log10edd_interp = np.append(rdat.log10edd_interp, edd_tmp)
+
         rdat.P_desired = P1.copy()
         rdat.T_desired = T1.copy()
         rdat.Kzz_desired = Kzz1.copy()
