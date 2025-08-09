@@ -55,11 +55,10 @@ def make_photochemical_model(stellar_flux='inputs/TRAPPIST1e_hazmat.txt'):
     return pc
 
 PRESS, TEMP, MIX, GRIDINTERPOLATOR = make_climate_interpolators()
-PHOTOCHEMICAL_MODEL = make_photochemical_model()
+PHOTOCHEMICAL_MODEL = make_photochemical_model('inputs/TRAPPIST1e_hazmat.txt')
+PHOTOCHEMICAL_MODEL_MUSCLES = make_photochemical_model('inputs/TRAPPIST1e_muscles.txt')
 
-def model(x):
-
-    pc = PHOTOCHEMICAL_MODEL
+def _model(x, pc):
 
     log10PN2 = 0.0
     log10Kzz = 5.0
@@ -76,11 +75,12 @@ def model(x):
     P_surf = np.sum([10.0**a for a in x_bc])
     
     # P-T-mix profile from climate model
-    P = PRESS(x)[:]
-    T = TEMP(x)[:]
+    ind = -2 # Chop off top of P-T profile, because it can be strange at TOA
+    P = PRESS(x)[:ind]
+    T = TEMP(x)[:ind]
     mix = {}
     for key in MIX:
-        mix[key] = MIX[key](x)[:]
+        mix[key] = MIX[key](x)[:ind]
     # Lower the mix if outside the climate grid.
     for i,sp in enumerate(species_var):
         if x[i] < GRIDINTERPOLATOR.min_gridvals[i]:
@@ -139,8 +139,17 @@ def make_result(x, pc, converged):
 
     return result
 
-if __name__ == "__main__":
-    # mpiexec -n X python photochem_grid.py
+# Nominal case.
+def model(x):
+    pc = PHOTOCHEMICAL_MODEL
+    return _model(x, pc)
+
+# Muscles spectrum
+def model_muscles(x):
+    pc = PHOTOCHEMICAL_MODEL_MUSCLES
+    return _model(x, pc)
+
+def main():
     make_grid(
         model_func=model, 
         gridvals=get_gridvals(), 
@@ -148,5 +157,21 @@ if __name__ == "__main__":
         progress_filename='results/photochem_v1.log'
     )
     
+def main_muscles():
+    make_grid(
+        model_func=model_muscles, 
+        gridvals=get_gridvals(), 
+        filename='results/photochem_muscles_v1.h5', 
+        progress_filename='results/photochem_muscles_v1.log'
+    )
+
+if __name__ == "__main__":
+    # mpiexec -n X python photochem_grid.py
+
+    # Nominal case
+    main()
+
+    # Use the muscles spectrum
+    # main_muscles()
 
 
