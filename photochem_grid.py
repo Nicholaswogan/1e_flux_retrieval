@@ -3,6 +3,8 @@ warnings.filterwarnings('ignore')
 
 from gridutils import make_grid, GridInterpolator
 import numpy as np
+import h5py
+from scipy import constants as const
 from threadpoolctl import threadpool_limits
 _ = threadpool_limits(limits=1)
 
@@ -58,7 +60,7 @@ PRESS, TEMP, MIX, GRIDINTERPOLATOR = make_climate_interpolators()
 PHOTOCHEMICAL_MODEL = make_photochemical_model('inputs/TRAPPIST1e_hazmat.txt')
 PHOTOCHEMICAL_MODEL_MUSCLES = make_photochemical_model('inputs/TRAPPIST1e_muscles.txt')
 
-def _model(x, pc):
+def _model_setup(x, pc):
 
     log10PN2 = 0.0
     log10Kzz = 5.0
@@ -100,11 +102,48 @@ def _model(x, pc):
     Pi = x_to_press(species_bc, x_bc) # dynes/cm^2
 
     pc.initialize_to_PT_bcs(P, T, Kzz, mix, Pi)
+
+def _model(x, pc):
+    
+    # Sets up pc for calculation
+    _model_setup(x, pc)
+    
+    # Finds steady state
     converged = pc.find_steady_state_robust()
 
+    # Makes results
     result = make_result(x, pc, converged)
 
     return result
+
+def initialize_from_file(pc, filename, index):
+    
+    # Get x
+    gridvals = get_gridvals()
+    x = [gridvals[i][index[i]] for i in range(len(index))]
+
+    # Setup the model
+    _model_setup(x, pc)
+
+    # Open results file, and gather needed information
+    with h5py.File(filename,'r') as f:
+        z = f['results']['z'][index]
+        dz = z[1] - z[0]
+        top_atmos = z[-1] + dz/2
+        
+        P = f['results']['P'][index]
+        T = f['results']['T'][index]
+        n = P/(const.k*1e7*T)
+
+        usol = np.empty_like(pc.wrk.usol)
+        for i,sp in enumerate(pc.dat.species_names[:-2-pc.dat.nsl]):
+            usol[i,:] = f['results'][sp][index]*n
+
+    # Set relevant variables
+    pc.update_vertical_grid(TOA_alt=top_atmos)
+    pc.set_temperature(T.astype(np.double))
+    pc.wrk.usol = usol
+    pc.prep_atmosphere(pc.wrk.usol)
 
 def x_to_press(species, x):
     Pi = {
