@@ -7,6 +7,9 @@ from scipy import integrate
 from scipy import constants as const
 from scipy import interpolate
 
+from picaso import justdoit as jdi
+from photochem.utils import stars
+from photochem._clima import rebin, rebin_with_errors
 from photochem.clima import AdiabatClimate, ClimaException
 from photochem import EvoAtmosphere, PhotoException
 
@@ -674,3 +677,117 @@ ATMOSPHERE_INIT = \
 0.0      1          1000       1e6              
 1.0e3    1          1000       1e6         
 """
+
+class Picaso():
+
+    def __init__(self, filename_db, M_planet, R_planet, R_star, opannection_kwargs={}, star_kwargs={}):
+
+        self.opa = jdi.opannection(filename_db=filename_db, **opannection_kwargs)
+        self.case = jdi.inputs()
+        self.case.phase_angle(0)
+        self.case.gravity(mass=M_planet, mass_unit=jdi.u.Unit('M_earth'),
+                     radius=R_planet, radius_unit=jdi.u.Unit('R_earth'))
+        self.case.star(self.opa, radius=R_star, radius_unit=jdi.u.Unit('R_sun'), **star_kwargs)
+        self.case.surface_reflect(np.ones(self.opa.wno.shape[0])*0.0,self.opa.wno)
+
+    def set_custom_albedo(self, wv, albedo):
+        self.case.surface_reflect(albedo[::-1].copy(), self.opa.wno, (1e4/wv[::-1]).copy())
+
+    def clouds_reset(self):
+        self.case.inputs['clouds'] = {
+            'profile': None,
+            'wavenumber': None,
+            'scattering': {'g0': None, 'w0': None, 'opd': None}
+        }
+
+    def _spectrum(self, atm, calculation='thermal', atmosphere_kwargs={}, cloud_filename=None, log10Pcloudbottom=None, dlog10Pcloud=None, **kwargs):
+        self.case.atmosphere(df=atm, verbose=False, **atmosphere_kwargs)
+        self.case.approx(p_reference=np.max(atm['pressure'].to_numpy()))
+        if cloud_filename is not None:
+            self.case.clouds(filename=cloud_filename, delim_whitespace=True)
+        if log10Pcloudbottom is not None or log10Pcloudbottom is not None:
+            self.case.clouds(g0=[0.9], w0=[0.9], opd=[10], p=[log10Pcloudbottom], dp=[dlog10Pcloud])
+        df = self.case.spectrum(self.opa, calculation=calculation, **kwargs)
+        return df
+
+    def rprs2(self, atm, R=100, wavl=None, atmosphere_kwargs={}, cloud_filename=None, log10Pcloudbottom=None, dlog10Pcloud=None, **kwargs):
+
+        df = self._spectrum(
+            atm, 'transmission', atmosphere_kwargs=atmosphere_kwargs, 
+            cloud_filename=cloud_filename, log10Pcloudbottom=log10Pcloudbottom, dlog10Pcloud=dlog10Pcloud, 
+            **kwargs
+        )
+
+        wv_h = 1e4/df['wavenumber'][::-1].copy()
+        wavl_h = stars.make_bins(wv_h)
+        rprs2_h = df['transit_depth'][::-1].copy()
+
+        if wavl is None:
+            wavl = stars.grid_at_resolution(np.min(wavl_h), np.max(wavl_h), R)
+
+        rprs2 = rebin(wavl_h.copy(), rprs2_h.copy(), wavl.copy())
+
+        return wavl, rprs2
+    
+    def create_exo_dict(self, R_planet, R_star, total_observing_time, eclipse_duration, kmag, starpath):
+        from pandexo.engine import justdoit as pandexo_jdi
+
+        exo_dict = pandexo_jdi.load_exo_dict()
+
+        exo_dict['observation']['sat_level'] = 80
+        exo_dict['observation']['sat_unit'] = '%'
+        exo_dict['observation']['noccultations'] = 1
+        exo_dict['observation']['R'] = None
+        exo_dict['observation']['baseline_unit'] = 'total'
+        exo_dict['observation']['baseline'] = total_observing_time
+        exo_dict['observation']['noise_floor'] = 0
+
+        exo_dict['star']['type'] = 'user'
+        exo_dict['star']['mag'] = kmag
+        exo_dict['star']['ref_wave'] = 2.22
+        exo_dict['star']['starpath'] = starpath
+        exo_dict['star']['w_unit'] = 'um'
+        exo_dict['star']['f_unit'] = 'FLAM'
+        exo_dict['star']['radius'] = R_star
+        exo_dict['star']['r_unit'] = 'R_sun'
+
+        exo_dict['planet']['type'] = 'constant'
+        exo_dict['planet']['transit_duration'] = eclipse_duration
+        exo_dict['planet']['td_unit'] = 's'
+        exo_dict['planet']['radius'] = R_planet
+        exo_dict['planet']['r_unit'] = 'R_earth'
+        exo_dict['planet']['f_unit'] = 'rp^2/r*^2'
+
+        return exo_dict
+    
+    def _run_pandexo(self, R_planet, R_star, total_observing_time, eclipse_duration, kmag, inst, starpath, verbose=False, **kwargs):
+        from pandexo.engine import justdoit as pandexo_jdi
+
+        exo_dict = self.create_exo_dict(R_planet, R_star, total_observing_time, eclipse_duration, kmag, starpath)
+
+        # Run pandexo
+        result = pandexo_jdi.run_pandexo(exo_dict, inst, verbose=verbose, **kwargs)
+
+        return result
+
+    def run_pandexo(self, R_planet, R_star, total_observing_time, eclipse_duration, kmag, inst, starpath, R=None, ntrans=1, verbose=False, **kwargs):
+
+        # inst is just a string
+        assert isinstance(inst, str)
+        result = self._run_pandexo(R_planet, R_star, total_observing_time, eclipse_duration, kmag, [inst], starpath, verbose, **kwargs)
+
+        spec = result['FinalSpectrum']
+        wavl = stars.make_bins(spec['wave'])
+        F = spec['spectrum']
+        err = spec['error_w_floor']
+        err = err/np.sqrt(ntrans)
+
+        if R is not None:
+            wavl_n = stars.grid_at_resolution(np.min(wavl), np.max(wavl), R)
+            F_n, err_n = rebin_with_errors(wavl.copy(), F.copy(), err.copy(), wavl_n.copy())
+            wavl = wavl_n
+            F = F_n
+            err = err_n
+
+        return wavl, F, err
+    
