@@ -333,6 +333,13 @@ def make_cases():
     params['offset'] = None
     cases['archean_constrained'] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
 
+    # Make a couple more cases which consider all parameters, but with various number of transits
+    params = {a: None for a in ALL_MODEL_PARAMETERS}
+    for ntrans in [20, 30, 40, 50, 60, 70, 80, 90, 100]:
+        data_dict = make_data_dict_nominal_archean(ntrans=ntrans)
+        key = 'archean_%i'%ntrans
+        cases[key] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
+
     return cases
 
 RETRIEVAL_CASES = make_cases()
@@ -340,7 +347,10 @@ RETRIEVAL_CASES = make_cases()
 if __name__ == '__main__':
     # mpiexec -n <number of processes> python retrieval_run.py
 
-    models_to_run = ['archean','archean_muscles','archean_constrained']
+    models_to_run = [
+        'archean_20','archean_30','archean_40','archean_50','archean_60',
+        'archean_70','archean_80','archean_90','archean_100'
+    ]
     for model_name in models_to_run:
 
         # Setup directories
