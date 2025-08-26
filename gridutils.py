@@ -312,7 +312,7 @@ def symlog_transform_func(linthresh):
         out[~mask] = y[~mask] / linthresh
 
         # Logarithmic region
-        out[mask] = sign[mask] * (np.log(np.abs(y[mask]) / linthresh) + 1.0)
+        out[mask] = sign[mask] * (np.log10(np.abs(y[mask]) / linthresh) + 1.0)
 
         return out
     return func
@@ -330,7 +330,7 @@ def symlog_inverse_func(linthresh):
         out[~mask] = z[~mask] * linthresh
 
         # Logarithmic region
-        out[mask] = sign[mask] * np.exp(np.abs(z[mask]) - 1.0) * linthresh
+        out[mask] = sign[mask] * 10.0**(np.abs(z[mask]) - 1.0) * linthresh
 
         return out
     return func
