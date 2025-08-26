@@ -123,20 +123,24 @@ def _model(y, wavl, p, P_interp, T_interp, f_interp, **kwargs):
 def quantile_to_uniform(quantile, lower_bound, upper_bound):
     return quantile*(upper_bound - lower_bound) + lower_bound
 
+def build_x(y, params):
+    x = np.zeros(len(ALL_MODEL_PARAMETERS))
+    j = 0
+    for i,sp in enumerate(ALL_MODEL_PARAMETERS):
+        if params[sp] is None:
+            x[i] = y[j]
+            j += 1
+        else:
+            x[i] = params[sp]
+    return x
+
 def make_model(params, p, P_interp, T_interp, f_interp):
     def model1(y, wavl, **kwargs):
-        x = np.zeros(len(ALL_MODEL_PARAMETERS))
-        j = 0
-        for i,sp in enumerate(ALL_MODEL_PARAMETERS):
-            if params[sp] is None:
-                x[i] = y[j]
-                j += 1
-            else:
-                x[i] = params[sp]
+        x = build_x(y, params)
         return _model(x, wavl, p, P_interp, T_interp, f_interp, **kwargs)
     return model1
 
-def make_loglike_prior(params, data_dict, p, P_interp, T_interp, f_interp, prior_ranges=None):
+def make_loglike_prior(params, data_dict, p, P_interp, z_interp, T_interp, f_interp, particle_interp, flux_interp, prior_ranges=None):
     # example:
     # params = {
     #     'log10CO2': None, # means it is fit for
@@ -188,7 +192,22 @@ def make_loglike_prior(params, data_dict, p, P_interp, T_interp, f_interp, prior
                 j += 1
         return res
 
-    return loglike, prior, param_names, model1, data_dict_copy
+    out = {
+        'loglike': loglike,
+        'prior': prior,
+        'param_names': param_names,
+        'model': model1,
+        'params': params,
+        'data_dict': data_dict,
+        'P_interp': P_interp,
+        'z_interp': z_interp,
+        'T_interp': T_interp,
+        'f_interp': f_interp,
+        'particle_interp': particle_interp,
+        'flux_interp': flux_interp,
+    }
+
+    return out
 
 def make_prism_data():
     "One transit NIRSpec PRISM TRAPPIST-1e"
@@ -298,11 +317,11 @@ def make_cases():
     # Nominal case. Archean Earth with 10 transits of Prism. Hazmat grid.
     data_dict = make_data_dict_nominal_archean(ntrans=10) # data made with Hazmat grid.
     params = {a: None for a in ALL_MODEL_PARAMETERS} # fit for all parameters
-    cases['archean'] = make_loglike_prior(params, data_dict, PICASO, PRESS, TEMP, MIX)
+    cases['archean'] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
 
     # Archean Earth with 10 transits of Prism. Muscles grid, but the data is generated with Hazmat grid.
     params = {a: None for a in ALL_MODEL_PARAMETERS} # fit for all parameters
-    cases['archean_muscles'] = make_loglike_prior(params, data_dict, PICASO, PRESS_M, TEMP_M, MIX_M)
+    cases['archean_muscles'] = make_loglike_prior(params, data_dict, PICASO, PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M)
 
     # Nominal case, except we will assume that we know the partial pressures of O2, CO and H2. 
     # This gets at the question of how much not knowing these things matters.
@@ -312,7 +331,7 @@ def make_cases():
     params['log10CH4'] = None
     params['log10Pcloud'] = None
     params['offset'] = None
-    cases['archean_constrained'] = make_loglike_prior(params, data_dict, PICASO, PRESS, TEMP, MIX)
+    cases['archean_constrained'] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
 
     return cases
 
@@ -324,9 +343,6 @@ if __name__ == '__main__':
     models_to_run = ['archean','archean_muscles','archean_constrained']
     for model_name in models_to_run:
 
-        # Get the relevant log-like etc.
-        loglike, prior, param_names, _, _ = RETRIEVAL_CASES[model_name]
-
         # Setup directories
         outputfiles_basename = f'pymultinest/{model_name}/{model_name}'
         try:
@@ -336,9 +352,9 @@ if __name__ == '__main__':
 
         # Do nested sampling
         results = solve(
-            LogLikelihood=loglike, 
-            Prior=prior, 
-            n_dims=len(param_names), 
+            LogLikelihood=RETRIEVAL_CASES[model_name]['loglike'], 
+            Prior=RETRIEVAL_CASES[model_name]['prior'], 
+            n_dims=len(RETRIEVAL_CASES[model_name]['param_names']), 
             outputfiles_basename=outputfiles_basename, 
             verbose=True,
             n_live_points=1000
