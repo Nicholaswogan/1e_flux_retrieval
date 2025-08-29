@@ -195,6 +195,7 @@ def make_loglike_prior(params, data_dict, p, P_interp, z_interp, T_interp, f_int
     out = {
         'loglike': loglike,
         'prior': prior,
+        'prior_ranges': prior_ranges,
         'param_names': param_names,
         'model': model1,
         'params': params,
@@ -208,6 +209,14 @@ def make_loglike_prior(params, data_dict, p, P_interp, z_interp, T_interp, f_int
     }
 
     return out
+
+def sample_prior(params, prior_ranges, size=None):
+    y = []
+    for i,sp in enumerate(ALL_MODEL_PARAMETERS):
+        if params[sp] is None:
+            val = np.random.uniform(*prior_ranges[sp],size=size)
+            y.append(val)
+    return np.array(y).T
 
 def make_prism_data():
     "One transit NIRSpec PRISM TRAPPIST-1e"
@@ -333,6 +342,14 @@ def make_cases():
     params['offset'] = None
     cases['archean_constrained'] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
 
+    # Tests to see what constraints CH4 flux.
+    x = data_dict['truth']
+    for sp in ['CO2','O2','CO','H2','CH4']:
+        params = {a: None for a in ALL_MODEL_PARAMETERS}
+        ind = ALL_MODEL_PARAMETERS.index('log10'+sp)
+        params['log10'+sp] = x[ind]
+        cases['archean_'+sp] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
+
     # Make a couple more cases which consider all parameters, but with various number of transits
     params = {a: None for a in ALL_MODEL_PARAMETERS}
     for ntrans in [20, 30, 40, 50, 60, 70, 80, 90, 100]:
@@ -348,8 +365,7 @@ if __name__ == '__main__':
     # mpiexec -n <number of processes> python retrieval_run.py
 
     models_to_run = [
-        'archean_20','archean_30','archean_40','archean_50','archean_60',
-        'archean_70','archean_80','archean_90','archean_100'
+        'archean_CO2','archean_O2','archean_CO','archean_H2','archean_CH4' 
     ]
     for model_name in models_to_run:
 
