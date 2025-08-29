@@ -3,6 +3,18 @@
 conda create -n flux -c conda-forge -c bokeh photochem=0.6.7 numpy=1.24 mpi4py dill tqdm astropy matplotlib pandas pip xarray pathos bokeh=2.4.3 wget unzip tar pymultinest=2.12
 conda activate flux
 
+# prereqs for Photochem build
+conda install scikit-build cmake=3 ninja cython fypp pip c-compiler cxx-compiler fortran-compiler git
+# build Photochem
+wget https://github.com/nicholaswogan/photochem/archive/6775d3ef2075428a9cbdf909ead9b6f5d460000d.zip
+unzip 6775d3ef2075428a9cbdf909ead9b6f5d460000d.zip
+cd photochem-6775d3ef2075428a9cbdf909ead9b6f5d460000d
+export CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
+python -m pip install --no-deps --no-build-isolation . -v
+cd ..
+rm -rf photochem-6775d3ef2075428a9cbdf909ead9b6f5d460000d
+rm 6775d3ef2075428a9cbdf909ead9b6f5d460000d.zip
+
 # Install picaso
 pip install picaso==3.1.2 -v
 
@@ -24,7 +36,7 @@ export picaso_refdata=$(pwd)"/picasofiles/reference/"
 ```
 
 
-```sh
+<!-- ```sh
 # Install pymultinest
 pip install pymultinest==2.12 -v
 
@@ -41,4 +53,4 @@ rm v3.10b.tar.gz
 
 export DYLD_LIBRARY_PATH=$(pwd)"/lib/"
 export LD_LIBRARY_PATH=$(pwd)"/lib/"
-```
+``` -->

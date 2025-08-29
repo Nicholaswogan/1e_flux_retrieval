@@ -13,10 +13,10 @@ import utils
 
 def get_gridvals():
     log10PCO2 = np.append([-9,-7],np.arange(-5,1.01,1))
-    log10PO2 = np.append([-15,-11],np.arange(-7,1.01,2))
+    log10PO2 = np.append([-19,-15,-11,-9],np.arange(-7,1.01,2))
     log10PCO = np.append([-11],np.arange(-7,1.01,2))
-    log10PH2 = np.append([-9],np.arange(-6,0.01,2))
-    log10PCH4 = np.append([-11,-9],np.arange(-7,1.01,1))
+    log10PH2 = np.append([-10,-8],np.arange(-6,0.01,2))
+    log10PCH4 = np.append([-13,-11,-9],np.arange(-7,1.01,1))
     gridvals = (log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4)
     return gridvals
 

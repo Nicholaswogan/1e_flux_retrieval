@@ -9,7 +9,9 @@ planet:
   planet-radius: 5.867852e+08 # 0.920x Earth Radius (cm) Agol et al. (2021)
   surface-albedo: 0.1
   solar-zenith-angle: 60.0 # degrees
-  hydrogen-escape: {type: diffusion limited}
+  # S1 is the XUV flux relative to Earth. The choice below
+  # is based on Van Looveren et al. (2024), Sec. 3.2
+  hydrogen-escape: {type: zahnle, S1: 300}
   water: {fix-water-in-troposphere: off, gas-rainout: off, water-condensation: off}
 
 particles:
