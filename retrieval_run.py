@@ -20,8 +20,7 @@ from threadpoolctl import threadpool_limits
 _ = threadpool_limits(limits=1)
 
 def make_interpolators(filename, pc):
-    gridvals = photochem_grid.get_gridvals()
-    g = gridutils.GridInterpolator(filename, gridvals)
+    g = gridutils.GridInterpolator(filename)
 
     gas_names = pc.dat.species_names[pc.dat.np:-2]
     MIX = {}
@@ -94,7 +93,7 @@ def make_picaso(filename_db):
 # Globals
 PICASO = make_picaso(os.path.join(os.environ['picaso_refdata'],'opacities/opacities_0.3_15_R15000.db'))
 PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES = make_interpolators('results/photochem_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL)
-PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M = make_interpolators('results/photochem_muscles_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL_MUSCLES)
+# PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M = make_interpolators('results/photochem_muscles_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL_MUSCLES)
 ALL_MODEL_PARAMETERS = ['log10CO2','log10O2','log10CO','log10H2','log10CH4','log10Pcloud','offset']
 
 def _model(y, wavl, p, P_interp, T_interp, f_interp, **kwargs):
@@ -165,10 +164,10 @@ def make_loglike_prior(params, data_dict, p, P_interp, z_interp, T_interp, f_int
     if prior_ranges is None:
         prior_ranges = {
             'log10CO2': (-9, 1),
-            'log10O2': (-15, 1),
+            'log10O2': (-19, 1),
             'log10CO': (-11, 1),
-            'log10H2': (-9, 0),
-            'log10CH4': (-11, 1),
+            'log10H2': (-10, 0),
+            'log10CH4': (-13, 1),
             'log10Pcloud': (-5, 0),
             'offset': (-1000e-6, 1000e-6)
         }
@@ -328,31 +327,13 @@ def make_cases():
     params = {a: None for a in ALL_MODEL_PARAMETERS} # fit for all parameters
     cases['archean'] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
 
-    # Archean Earth with 10 transits of Prism. Muscles grid, but the data is generated with Hazmat grid.
-    params = {a: None for a in ALL_MODEL_PARAMETERS} # fit for all parameters
-    cases['archean_muscles'] = make_loglike_prior(params, data_dict, PICASO, PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M)
-
-    # Nominal case, except we will assume that we know the partial pressures of O2, CO and H2. 
-    # This gets at the question of how much not knowing these things matters.
-    x = data_dict['truth']
-    params = {ALL_MODEL_PARAMETERS[i]: x[i] for i in range(len(ALL_MODEL_PARAMETERS))}
-    params['log10CO2'] = None
-    params['log10CH4'] = None
-    params['log10Pcloud'] = None
-    params['offset'] = None
-    cases['archean_constrained'] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
-
-    # Tests to see what constraints CH4 flux.
-    x = data_dict['truth']
-    for sp in ['CO2','O2','CO','H2','CH4']:
-        params = {a: None for a in ALL_MODEL_PARAMETERS}
-        ind = ALL_MODEL_PARAMETERS.index('log10'+sp)
-        params['log10'+sp] = x[ind]
-        cases['archean_'+sp] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
+    # # Archean Earth with 10 transits of Prism. Muscles grid, but the data is generated with Hazmat grid.
+    # params = {a: None for a in ALL_MODEL_PARAMETERS} # fit for all parameters
+    # cases['archean_muscles'] = make_loglike_prior(params, data_dict, PICASO, PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M)
 
     # Make a couple more cases which consider all parameters, but with various number of transits
     params = {a: None for a in ALL_MODEL_PARAMETERS}
-    for ntrans in [20, 30, 40, 50, 60, 70, 80, 90, 100]:
+    for ntrans in [20, 30, 40, 50]:
         data_dict = make_data_dict_nominal_archean(ntrans=ntrans)
         key = 'archean_%i'%ntrans
         cases[key] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
@@ -364,9 +345,7 @@ RETRIEVAL_CASES = make_cases()
 if __name__ == '__main__':
     # mpiexec -n <number of processes> python retrieval_run.py
 
-    models_to_run = [
-        'archean_CO2','archean_O2','archean_CO','archean_H2','archean_CH4' 
-    ]
+    models_to_run = [key for key in RETRIEVAL_CASES]
     for model_name in models_to_run:
 
         # Setup directories

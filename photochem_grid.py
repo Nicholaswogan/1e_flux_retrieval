@@ -21,8 +21,7 @@ def get_gridvals():
     return gridvals
 
 def make_climate_interpolators():
-    gridvals = climate_grid.get_gridvals()
-    g = GridInterpolator('results/climate_v2.h5',gridvals)
+    g = GridInterpolator('results/climate_v2.h5')
     PRESS = g.make_interpolator('P',logspace=True)
     TEMP = g.make_interpolator('T')
     MIX = {}

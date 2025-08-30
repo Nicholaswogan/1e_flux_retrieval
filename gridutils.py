@@ -21,13 +21,21 @@ def initialize_hdf5(filename):
     with h5py.File(filename, 'w') as f:
         pass
 
-def save_result_hdf5(filename, index, x, res, grid_shape):
+def save_result_hdf5(filename, index, x, res, grid_shape, gridvals):
     """Save a single result to the preallocated HDF5 file."""
 
     unraveled_idx = np.unravel_index(index, grid_shape)
 
     with h5py.File(filename, 'a') as f:
-        
+
+        # Save the gridvals if that has not happened
+        if 'gridvals' not in f:
+            f.create_group('gridvals')
+            for i,gridval in enumerate(gridvals):
+                key = '%i'%i
+                f['gridvals'].create_dataset(key, shape=(len(gridval),), dtype=gridval.dtype)
+                f['gridvals'][key][:] = gridval
+
         # Save input parameters
         if 'inputs' not in f:
             f.create_dataset('inputs', shape=(np.prod(grid_shape),len(x),), dtype=x.dtype)
@@ -111,7 +119,7 @@ def master(model_func, gridvals, filename, progress_filename):
             worker_rank = status.Get_source()
 
             # Save the result
-            save_result_hdf5(filename, index, x, res, gridshape)
+            save_result_hdf5(filename, index, x, res, gridshape, gridvals)
             
             pbar.update(1)
             log_file.flush()
@@ -211,7 +219,7 @@ class GridInterpolator():
         The results from the HDF5 file.
     """
 
-    def __init__(self, filename, gridvals):
+    def __init__(self, filename):
         """
         Initialize the GridInterpolator by loading data from an HDF5 file.
 
@@ -223,16 +231,22 @@ class GridInterpolator():
         gridvals : tuple of np.ndarray
             The parameter grid values, used to define the interpolation space.
         """
-        self.gridvals = gridvals
-        self.gridshape = tuple(len(a) for a in gridvals)
-
-        self.min_gridvals = np.array([np.min(a) for a in self.gridvals])
-        self.max_gridvals = np.array([np.max(a) for a in self.gridvals])
 
         with h5py.File(filename, 'r') as f:
             self.data = {}
             for key in f['results'].keys():
                 self.data[key] = f['results'][key][...]
+            gridvals = []
+            for i in range(len(f['gridvals'])):
+                key = '%i'%i
+                gridvals.append(f['gridvals'][key][:])
+            gridvals = tuple(gridvals)
+
+        self.gridvals = gridvals
+        self.gridshape = tuple(len(a) for a in gridvals)
+
+        self.min_gridvals = np.array([np.min(a) for a in self.gridvals])
+        self.max_gridvals = np.array([np.max(a) for a in self.gridvals])
 
     def make_interpolator(self, key, method='linear', linthresh=1.0, logspace=None):
         """
