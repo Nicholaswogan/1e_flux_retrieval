@@ -90,12 +90,6 @@ def make_picaso(filename_db):
     )
     return p
 
-# Globals
-PICASO = make_picaso(os.path.join(os.environ['picaso_refdata'],'opacities/opacities_0.3_15_R15000.db'))
-PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES = make_interpolators('results/photochem_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL)
-PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M = make_interpolators('results/photochem_muscles_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL_MUSCLES)
-ALL_MODEL_PARAMETERS = ['log10CO2','log10O2','log10CO','log10H2','log10CH4','log10Pcloud','offset']
-
 def _model(y, wavl, p, P_interp, T_interp, f_interp, **kwargs):
 
     log10PCO2,log10PO2,log10PCO,log10PH2,log10PCH4,log10Pcloud,offset = y
@@ -319,17 +313,61 @@ def make_data_dict_nominal_archean(ntrans, R=None):
 
     return data_dict
 
-def make_cases():
-    cases = {}
-
+def save_hdf5_nominal_archean_10trans():
     # Nominal case. Archean Earth with 10 transits of Prism. Hazmat grid.
     data_dict = make_data_dict_nominal_archean(ntrans=10) # data made with Hazmat grid.
+
+    wavl = data_dict['wavl']
+    rprs2 = data_dict['rprs2']
+    err = data_dict['err']
+    truth = np.array(data_dict['truth'])
+
+    with h5py.File('data/TRAPPIST1e_prism_10trans_archean_hazmat.h5','w') as f:
+        f.create_dataset('wavl', shape=wavl.shape, dtype=wavl.dtype)
+        f['wavl'][:] = wavl
+
+        f.create_dataset('rprs2', shape=rprs2.shape, dtype=rprs2.dtype)
+        f['rprs2'][:] = rprs2
+
+        f.create_dataset('err', shape=err.shape, dtype=err.dtype)
+        f['err'][:] = err
+
+        f.create_dataset('truth', shape=truth.shape, dtype=truth.dtype)
+        f['truth'][:] = truth
+
+def read_hdf5_nominal_archean_10trans():
+
+    with h5py.File('data/TRAPPIST1e_prism_10trans_archean_hazmat.h5','r') as f:
+        wavl = f['wavl'][:]
+        rprs2 = f['rprs2'][:]
+        err = f['err'][:]
+        truth = f['truth'][:]
+
+    data_dict = {
+        'wavl': wavl,
+        'rprs2': rprs2,
+        'err': err,
+        'truth': truth
+    }
+
+    return data_dict
+
+def make_cases(hazmat=True, muscles=True):
+    cases = {}
+
+    if muscles:
+        # Archean Earth with 10 transits of Prism. Muscles grid, but the data is generated with Hazmat grid.
+        data_dict = read_hdf5_nominal_archean_10trans() # data made with Hazmat grid.
+        params = {a: None for a in ALL_MODEL_PARAMETERS} # fit for all parameters
+        cases['archean_muscles'] = make_loglike_prior(params, data_dict, PICASO, PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M)
+
+    if not hazmat:
+        return cases
+
+    # Nominal case. Archean Earth with 10 transits of Prism. Hazmat grid.
+    data_dict = read_hdf5_nominal_archean_10trans() # data made with Hazmat grid.
     params = {a: None for a in ALL_MODEL_PARAMETERS} # fit for all parameters
     cases['archean'] = make_loglike_prior(params, data_dict, PICASO, PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES)
-
-    # # Archean Earth with 10 transits of Prism. Muscles grid, but the data is generated with Hazmat grid.
-    params = {a: None for a in ALL_MODEL_PARAMETERS} # fit for all parameters
-    cases['archean_muscles'] = make_loglike_prior(params, data_dict, PICASO, PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M)
 
     # Make a couple more cases which consider all parameters, but with various number of transits
     params = {a: None for a in ALL_MODEL_PARAMETERS}
@@ -340,10 +378,19 @@ def make_cases():
 
     return cases
 
-RETRIEVAL_CASES = make_cases()
+# Globals
+PICASO = make_picaso(os.path.join(os.environ['picaso_refdata'],'opacities/opacities_0.3_15_R15000.db'))
+# PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES = make_interpolators('results/photochem_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL)
+PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M = make_interpolators('results/photochem_muscles_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL_MUSCLES)
+ALL_MODEL_PARAMETERS = ['log10CO2','log10O2','log10CO','log10H2','log10CH4','log10Pcloud','offset']
+
+RETRIEVAL_CASES = make_cases(hazmat=False, muscles=True)
 
 if __name__ == '__main__':
     # mpiexec -n <number of processes> python retrieval_run.py
+
+    # This needs to happen if the hazmat grid is changed.
+    # save_hdf5_nominal_archean_10trans()
 
     models_to_run = ['archean_muscles']
     for model_name in models_to_run:
