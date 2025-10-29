@@ -388,8 +388,10 @@ def make_cases(hazmat=True, muscles=True):
     return cases
 
 # Globals
-PICASO = make_picaso(os.path.join(os.environ['picaso_refdata'],'opacities/opacities_photochem_0.1_250.0_R15000.db'))
-# PICASO = make_picaso('/Users/nicholas/Applications/picaso_data/reference/opacities/opacities_photochem_0.1_250.0_R15000.db')
+try:
+    PICASO = make_picaso('/Users/nicholas/Applications/picaso_data/reference/opacities/opacities_photochem_0.1_250.0_R15000.db')
+except:
+    PICASO = make_picaso(os.path.join(os.environ['picaso_refdata'],'opacities/opacities_photochem_0.1_250.0_R15000.db'))
 PRESS, ALT, TEMP, MIX, PARTICLES, FLUXES = make_interpolators('results/photochem_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL)
 # PRESS_M, ALT_M, TEMP_M, MIX_M, PARTICLES_M, FLUXES_M = make_interpolators('results/photochem_muscles_v1.h5', photochem_grid.PHOTOCHEMICAL_MODEL_MUSCLES)
 ALL_MODEL_PARAMETERS = ['log10CO2','log10O2','log10CO','log10H2','log10CH4','log10Pcloud','offset']
