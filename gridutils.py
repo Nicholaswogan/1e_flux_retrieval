@@ -35,6 +35,10 @@ def save_result_hdf5(filename, index, x, res, grid_shape, gridvals):
                 key = '%i'%i
                 f['gridvals'].create_dataset(key, shape=(len(gridval),), dtype=gridval.dtype)
                 f['gridvals'][key][:] = gridval
+        else:
+            # Need to check that gridvals in file is the same as gridvals
+            # Maybe do this at the beginning of the file call, though
+            pass
 
         # Save input parameters
         if 'inputs' not in f:
