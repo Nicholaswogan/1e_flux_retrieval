@@ -16,19 +16,19 @@ dependencies:
   - xarray=2024.9.0
   - pymultinest=2.12
   - matplotlib
-  - pip
-  - wget
-  - tar
-  - unzip
-  - jupyter
-  - cmake=3 
-  - ninja 
-  - cython 
-  - fypp 
-  - c-compiler 
-  - cxx-compiler 
-  - fortran-compiler 
-  - git
-  - scikit-build
-  - corner
+  - pip=25.2
+  - wget=1.25.0
+  - tar=1.35
+  - unzip=6.0
+  - jupyter=1.1.1
+  - cmake=3.31.8 
+  - ninja=1.13.1 
+  - cython=3.1.6
+  - fypp=3.2
+  - c-compiler=1.11.0 
+  - cxx-compiler=1.11.0
+  - fortran-compiler=1.11.0 
+  - git=2.51.0
+  - scikit-build=0.18.1
+  - corner=2.2.3
 
