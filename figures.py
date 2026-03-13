@@ -137,12 +137,17 @@ def make_case_simple(key):
     res['fluxes'] = fluxes
 
     # CO flux
-    tmp = np.empty(samples.shape[0])
+    tmp_CO = np.empty(samples.shape[0])
+    tmp_H2 = np.empty(samples.shape[0])
     for i in range(samples.shape[0]):
         x = samples[i,:]
         y = retrieval_run.build_x(x, case['params'])
-        tmp[i] = retrieval_run.flux_from_vdep(y[:-2], 'CO', 1.2e-4, case['P_interp'], case['T_interp'], case['f_interp'])
-    res['CO_flux_down_min'] = -tmp
+        tmp_CO[i] = retrieval_run.flux_from_vdep(y[:-2], 'CO', 1.2e-4, case['P_interp'], case['T_interp'], case['f_interp'])
+        tmp_H2[i] = retrieval_run.flux_from_vdep(y[:-2], 'H2', 2.4e-4, case['P_interp'], case['T_interp'], case['f_interp'])
+    
+    # These are the minimum upward fluxes, given what we know about the maximum downward flux
+    res['CO_flux_up_max'] = np.maximum(fluxes['CO'] + tmp_CO, 0.0)
+    res['H2_flux_up_max'] = np.maximum(fluxes['H2'] + tmp_H2, 0.0)
     
     # Priors on fluxes
     np.random.seed(0)
@@ -158,12 +163,16 @@ def make_case_simple(key):
         prior_fluxes[sp] = tmp
     res['prior_fluxes'] = prior_fluxes
 
-    tmp = np.empty(samples.shape[0])
+    tmp_CO = np.empty(samples.shape[0])
+    tmp_H2 = np.empty(samples.shape[0])
     for i in range(samples.shape[0]):
         x = samples[i,:]
         y = retrieval_run.build_x(x, case['params'])
-        tmp[i] = retrieval_run.flux_from_vdep(y[:-2], 'CO', 1.2e-4, case['P_interp'], case['T_interp'], case['f_interp'])
-    res['prior_CO_flux_down_min'] = -tmp
+        tmp_CO[i] = retrieval_run.flux_from_vdep(y[:-2], 'CO', 1.2e-4, case['P_interp'], case['T_interp'], case['f_interp'])
+        tmp_H2[i] = retrieval_run.flux_from_vdep(y[:-2], 'H2', 2.4e-4, case['P_interp'], case['T_interp'], case['f_interp'])
+
+    res['prior_CO_flux_up_max'] = np.maximum(prior_fluxes['CO'] + tmp_CO, 0.0)
+    res['prior_H2_flux_up_max'] = np.maximum(prior_fluxes['H2'] + tmp_H2, 0.0)
     
     return case, res
 
@@ -344,11 +353,11 @@ def archean_corner_flux_plot():
     vals_prior = np.array(vals_prior).T
 
     param_names = [
-        '$\Phi_\mathrm{CO_2}$',           
-        '$\Phi_\mathrm{O_2}$', 
-        '$\Phi_\mathrm{CO}$', 
-        '$\Phi_\mathrm{H_2}$',
-        '$\Phi_\mathrm{CH_4}$'
+    r'$\Phi_\mathrm{CO_2}$',
+    r'$\Phi_\mathrm{O_2}$',
+    r'$\Phi_\mathrm{CO}$',
+    r'$\Phi_\mathrm{H_2}$',
+    r'$\Phi_\mathrm{CH_4}$'
     ]
 
     max_len = np.max([len(a) for a in [vals, vals_prior]])
@@ -402,6 +411,7 @@ def archean_corner_flux_plot():
 
     plt.savefig('figures/archean_corner_fluxes.pdf', bbox_inches='tight')
     # plt.show()
+    
 
 def methane_flux_plot():
     plt.rcParams.update({'font.size': 13.5})
@@ -445,18 +455,18 @@ def methane_flux_plot():
     val = np.log10(3.74e9*10)
     ax.axvline(val,c='C3',label='Abiotic upper limit\n(Thompson+2022)',lw=3, ls='--')
     # ax.text(np.log10(3.74e9*10)-0.3, .5, 'Approx. abiotic\nupper limit', size=12, ha='center', va='center', color='grey',rotation=90)
-    ax.annotate('Approx. abiotic\nupper limit', xy=(val-0.1, 0.8), xytext=(val-2.3, 0.8),
+    ax.annotate('Approx. abiotic\nupper limit\nfrom\nserpentinization', xy=(val-0.1, 0.8), xytext=(val-2.3, 0.8),
                 arrowprops=dict(facecolor='C3',ec='C3', arrowstyle="->", lw=1.5),
-                fontsize=11.5, color='C3', va='center')
+                fontsize=9, color='C3', va='center')
 
-    key = 'fluxes'
-    FCO = res[key]['CO'] - res['CO_flux_down_min']
-    methane_biosig = (res[key]['CH4'] > 3.74e9*10) & ((res[key]['CH4'] > FCO) | (res[key]['H2'] < 0))
-    oxygen_biosig = (res[key]['CH4'] > 3.74e9*10) & (res[key]['O2'] > 3.74e9)
-    life = methane_biosig | oxygen_biosig
+    # key = 'fluxes'
+    # FCO = res[key]['CO'] - res['CO_flux_down_min']
+    # methane_biosig = (res[key]['CH4'] > 3.74e9*10) & ((res[key]['CH4'] > FCO) | (res[key]['H2'] < 0))
+    # oxygen_biosig = (res[key]['CH4'] > 3.74e9*10) & (res[key]['O2'] > 3.74e9)
+    # life = methane_biosig | oxygen_biosig
 
-    prob = np.mean(life)
-    ax.text(.5, 1.03, r'$P(\Phi \in B \mid data)$ '+'= %.2f'%(prob), size=13.5, ha='center', va='bottom', color='k', transform=ax.transAxes)
+    # prob = np.mean(life)
+    # ax.text(.5, 1.03, r'$P(\Phi \in B \mid data)$ '+'= %.2f'%(prob), size=13.5, ha='center', va='bottom', color='k', transform=ax.transAxes)
 
     ax.set_xlim(8,14)
     ax.set_ylabel('Probability density')
@@ -469,6 +479,32 @@ def methane_flux_plot():
     plt.savefig('figures/CH4_flux.pdf',bbox_inches='tight')
 
     # plt.show()
+
+def compute_life_prob(F_CH4, F_CO_up_max, F_H2_up_max, F_O2):
+
+    # Too high to be explained by 
+    CH4_too_high_for_serp = F_CH4 > 3.74e10
+    
+    # volcanic false positive proxy: CH4 accompanied by CO and H2 outgassing
+    volcanic_fp = CH4_too_high_for_serp & ((F_CO_up_max > F_CH4) & (F_H2_up_max > 1e-10))
+    
+    # conservative methane biosignature: high CH4 and not volcanic-like
+    methane_biosig = CH4_too_high_for_serp & ~volcanic_fp
+    
+    # disequilibrium biosignature proxy
+    oxygen_biosig = CH4_too_high_for_serp & (F_O2 > 1e-10)
+    
+    life = methane_biosig | oxygen_biosig
+
+    out = {
+        'CH4_too_high_for_serp': CH4_too_high_for_serp.mean(),
+        'volcanic_fp': volcanic_fp.mean(),
+        'methane_biosig': methane_biosig.mean(),
+        'oxygen_biosig': oxygen_biosig.mean(),
+        'life': life.mean()
+    }
+
+    return out
 
 def methane_flux_muscles_plot():
 
@@ -523,12 +559,13 @@ def methane_flux_muscles_plot():
                 fontsize=8.5, color=color, va='center', ha='center')
 
     key = 'fluxes'
-    FCO = res[key]['CO'] - res['CO_flux_down_min']
-    methane_biosig = (res[key]['CH4'] > 3.74e9*10) & ((res[key]['CH4'] > FCO) | (res[key]['H2'] < 0))
-    oxygen_biosig = (res[key]['CH4'] > 3.74e9*10) & (res[key]['O2'] > 3.74e9)
-    life = methane_biosig | oxygen_biosig
-    prob = np.mean(life)
-    ax.text(.13, .4, '$P(\Phi \in B \mid data)$\n'+'= %.2f'%(prob), size=8.5, ha='center', va='bottom', color='C0', transform=ax.transAxes)
+    F_CO_up_max = res['CO_flux_up_max']
+    F_CH4 = res[key]['CH4']
+    F_H2_up_max = res['H2_flux_up_max']
+    F_O2 = res[key]['O2']
+    out = compute_life_prob(F_CH4, F_CO_up_max, F_H2_up_max, F_O2)
+    prob = out['life']
+    ax.text(.13, .4, r'$P(\mathbf{F} \in \mathcal{L} \mid d)$'+'\n'+'= %.2f'%(prob), size=8.5, ha='center', va='bottom', color='C0', transform=ax.transAxes)
 
     color = 'k'
     case = case_archean
@@ -548,13 +585,13 @@ def methane_flux_muscles_plot():
     # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c='k', lw=3, label='Retrieved flux (10 transits)')
     # ax.hist(log10CH4, alpha=0.1, bins=bins, density=True, fc='k')
 
-    key = 'fluxes'
-    FCO = res[key]['CO'] - res['CO_flux_down_min']
-    methane_biosig = (res[key]['CH4'] > 3.74e9*10) & ((res[key]['CH4'] > FCO) | (res[key]['H2'] < 0))
-    oxygen_biosig = (res[key]['CH4'] > 3.74e9*10) & (res[key]['O2'] > 3.74e9)
-    life = methane_biosig | oxygen_biosig
-    prob = np.mean(life)
-    ax.text(.88, .16, '$P(\Phi \in B \mid data)$\n'+'= %.2f'%(prob), size=8.5, ha='center', va='bottom', color='k', transform=ax.transAxes)
+    F_CO_up_max = res['CO_flux_up_max']
+    F_CH4 = res[key]['CH4']
+    F_H2_up_max = res['H2_flux_up_max']
+    F_O2 = res[key]['O2']
+    out = compute_life_prob(F_CH4, F_CO_up_max, F_H2_up_max, F_O2)
+    prob = out['life']
+    ax.text(.88, .16, r'$P(\mathbf{F} \in \mathcal{L} \mid d)$'+'\n'+'= %.2f'%(prob), size=8.5, ha='center', va='bottom', color='k', transform=ax.transAxes)
 
 
     color = 'k'
@@ -566,15 +603,15 @@ def methane_flux_muscles_plot():
                 fontsize=10, color=color, va='center',ha='center')
 
     val = np.log10(3.74e9*10)
-    ax.axvline(val,c='C3',label='Approx. abiotic\nupper limit',lw=3, ls='--')
+    ax.axvline(val,c='C3',label='Approx. abiotic\nupper limit\nfrom serpentinization',lw=3, ls='--')
     # ax.text(np.log10(3.74e9*10)-0.3, .5, 'Approx. abiotic\nupper limit', size=12, ha='center', va='center', color='grey',rotation=90)
-    ax.annotate('Approx. abiotic\nupper limit', xy=(val, 0.75), xytext=(val+1.85, 0.75),
+    ax.annotate('Approx. abiotic\nupper limit\nfrom\nserpentinization', xy=(val, 0.72), xytext=(val+1.85, 0.72),
                 arrowprops=dict(facecolor='C3',ec='C3', arrowstyle="->", lw=1.5),
-                fontsize=11, color='C3', va='center', ha='center')
+                fontsize=9, color='C3', va='center', ha='center')
 
     ax.set_xlim(8,13.5)
     ax.set_ylabel('Probability density')
-    ax.set_xlabel('CH$_4$ surface flux ($\log_{10}$molec. cm$^{-2}$ s$^{-1}$)')
+    ax.set_xlabel(r'CH$_4$ surface flux ($\log_{10}$molec. cm$^{-2}$ s$^{-1}$)')
     # ticks = np.arange(8,14,1)
     # ax.set_xticks(ticks)
     # ax.set_xticklabels(['$10^{%i}$'%a for a in ticks])
@@ -659,7 +696,7 @@ def abundances_plot():
     bins = np.arange(-9.5,0.01,0.5)
     ax.set_xlim(-9,0)
     ax.set_xticks(np.arange(-9,0,2))
-    ax.set_xlabel('$\log_{10}(X_\mathrm{H_2})$')
+    ax.set_xlabel(r'$\log_{10}(X_\mathrm{H_2})$')
 
     hist, bin_edges = np.histogram(np.log10(atm_at_transit[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=3, ls='-', label='$10^{-3}$ bar')
@@ -668,10 +705,10 @@ def abundances_plot():
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=3, ls='-', label='Surface')
     ax.text(0.02, .4, 'Surface', size=10, ha='left', va='bottom', color=dark_color, transform=ax.transAxes)
 
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.5, ls='-', label='$10^{-3}$ bar')
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.5, ls='-', label='Surface')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.3, ls='-', label='$10^{-3}$ bar')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.3, ls='-', label='Surface')
 
     ax.axvline(np.log10(interp_atm_to_pressure(atm_true, sp, 1e-3*1e6)), lw=2, c=light_color, ls=':')
     ax.axvline(np.log10(atm_true[sp][0]), lw=2, c=dark_color, ls=':')
@@ -686,7 +723,7 @@ def abundances_plot():
     bins = np.arange(-14.5,0.01,0.5)
     ax.set_xlim(-14,0)
     ax.set_xticks(np.arange(-14,0,4))
-    ax.set_xlabel('$\log_{10}(X_\mathrm{O_2})$')
+    ax.set_xlabel(r'$\log_{10}(X_\mathrm{O_2})$')
 
     hist, bin_edges = np.histogram(np.log10(atm_at_transit[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=3, ls='-', label='$10^{-3}$ bar')
@@ -695,10 +732,10 @@ def abundances_plot():
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=3, ls='-', label='Surface')
     ax.text(0.03, .45, 'Surf.', size=10, ha='left', va='bottom', color=dark_color, transform=ax.transAxes)
 
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.5, ls='-', label='$10^{-3}$ bar')
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.5, ls='-', label='Surface')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.3, ls='-', label='$10^{-3}$ bar')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.3, ls='-', label='Surface')
 
     ax.axvline(np.log10(interp_atm_to_pressure(atm_true, sp, 1e-3*1e6)), lw=2, c=light_color, ls=':')
     ax.axvline(np.log10(atm_true[sp][0]), lw=2, c=dark_color, ls=':')
@@ -713,7 +750,7 @@ def abundances_plot():
     bins = np.arange(-8.5,0.01,0.5)
     ax.set_xlim(-8,0)
     ax.set_xticks(np.arange(-8,0,2))
-    ax.set_xlabel('$\log_{10}(X_\mathrm{H_2O})$')
+    ax.set_xlabel(r'$\log_{10}(X_\mathrm{H_2O})$')
 
     hist, bin_edges = np.histogram(np.log10(atm_at_transit[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=3, ls='-', label='$10^{-3}$ bar')
@@ -722,10 +759,10 @@ def abundances_plot():
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=3, ls='-', label='Surface')
     ax.text(0.5, .8, 'Surface', size=10, ha='left', va='bottom', color=dark_color, transform=ax.transAxes)
 
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.5, ls='-', label='$10^{-3}$ bar')
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.5, ls='-', label='Surface')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.3, ls='-', label='$10^{-3}$ bar')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.3, ls='-', label='Surface')
 
     ax.axvline(np.log10(interp_atm_to_pressure(atm_true, sp, 1e-3*1e6)), lw=2, c=light_color, ls=':')
     ax.axvline(np.log10(atm_true[sp][0]), lw=2, c=dark_color, ls=':')
@@ -749,10 +786,10 @@ def abundances_plot():
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=3, ls='-', label='Surface')
     ax.text(0.55, .25, 'Surface', size=10, ha='left', va='bottom', color=dark_color, transform=ax.transAxes)
 
-    hist, bin_edges = np.histogram(prior_atm_at_transit[sp],density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.5, ls='-', label='$10^{-3}$ bar')
-    hist, bin_edges = np.histogram(prior_atm_at_surface[sp],density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.5, ls='-', label='Surface')
+    # hist, bin_edges = np.histogram(prior_atm_at_transit[sp],density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.3, ls='-', label='$10^{-3}$ bar')
+    # hist, bin_edges = np.histogram(prior_atm_at_surface[sp],density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.3, ls='-', label='Surface')
 
     ax.axvline(interp_atm_to_pressure(atm_true, sp, 1e-3*1e6), lw=2, c=light_color, ls=':')
     ax.axvline(atm_true[sp][0], lw=2, c=dark_color, ls=':')
@@ -767,7 +804,7 @@ def abundances_plot():
     bins = np.arange(-5.5,0.01,0.5)
     ax.set_xlim(-5,0)
     ax.set_xticks(np.arange(-5,0.1,1))
-    ax.set_xlabel('$\log_{10}(X_\mathrm{CO_2})$')
+    ax.set_xlabel(r'$\log_{10}(X_\mathrm{CO_2})$')
 
     hist, bin_edges = np.histogram(np.log10(atm_at_transit[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=3, ls='-', label='$10^{-3}$ bar')
@@ -777,10 +814,10 @@ def abundances_plot():
     hist, bin_edges = np.histogram(np.log10(atm_at_surface[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=3, ls='-', label='Surface')
 
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.5, ls='-', label='$10^{-3}$ bar')
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.5, ls='-', label='Surface')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.3, ls='-', label='$10^{-3}$ bar')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.3, ls='-', label='Surface')
 
     ax.text(0.52, .55, 'Surface', size=10, ha='left', va='bottom', color=dark_color, transform=ax.transAxes)
     ax.axvline(np.log10(interp_atm_to_pressure(atm_true, sp, 1e-3*1e6)), lw=2, c=light_color, ls=':')
@@ -796,7 +833,7 @@ def abundances_plot():
     bins = np.arange(-8.5,0.01,0.5)
     ax.set_xlim(-8,0)
     ax.set_xticks(np.arange(-8,0.1,2))
-    ax.set_xlabel('$\log_{10}(X_\mathrm{CH_4})$')
+    ax.set_xlabel(r'$\log_{10}(X_\mathrm{CH_4})$')
 
     hist, bin_edges = np.histogram(np.log10(atm_at_transit[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=3, ls='-', label='$10^{-3}$ bar')
@@ -805,15 +842,19 @@ def abundances_plot():
     hist, bin_edges = np.histogram(np.log10(atm_at_surface[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=3, ls='-', label='Surface')
 
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.5, ls='-', label='$10^{-3}$ bar')
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.5, ls='-', label='Surface')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.3, ls='-', label='$10^{-3}$ bar')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.3, ls='-', label='Surface')
 
     ax.text(0.23, .55, 'Surface', size=10, ha='left', va='bottom', color=dark_color, transform=ax.transAxes)
     ax.axvline(np.log10(interp_atm_to_pressure(atm_true, sp, 1e-3*1e6)), lw=2, c=light_color, ls=':')
     ax.axvline(np.log10(atm_true[sp][0]), lw=2, c=dark_color, ls=':')
 
+    for sp in ['CO2','CH4','CO','H2','O2','H2O']:
+        val1 = np.quantile(np.log10(atm_at_transit[sp]), [.16, .84])
+        val2 = np.quantile(np.log10(atm_at_surface[sp]), [.95])
+        print(sp, np.round(val1, 1), np.round(val2, 1))
 
     sp = 'CO'
     ax = axs1[2]
@@ -824,7 +865,7 @@ def abundances_plot():
     bins = np.arange(-10.5,0.01,0.5)
     ax.set_xlim(-10,0)
     ax.set_xticks(np.arange(-10,0.1,2))
-    ax.set_xlabel('$\log_{10}(X_\mathrm{CO})$')
+    ax.set_xlabel(r'$\log_{10}(X_\mathrm{CO})$')
 
     hist, bin_edges = np.histogram(np.log10(atm_at_transit[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=3, ls='-', label='$10^{-3}$ bar')
@@ -834,10 +875,10 @@ def abundances_plot():
     hist, bin_edges = np.histogram(np.log10(atm_at_surface[sp][inds]),density=True, bins=bins)
     ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=3, ls='-', label='Surface')
 
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.5, ls='-', label='$10^{-3}$ bar')
-    hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
-    ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.5, ls='-', label='Surface')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_transit[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=light_color, lw=0.3, ls='-', label='$10^{-3}$ bar')
+    # hist, bin_edges = np.histogram(np.log10(prior_atm_at_surface[sp]),density=True, bins=bins)
+    # ax.plot(bin_edges[1:],hist,drawstyle='steps-pre', c=dark_color, lw=0.3, ls='-', label='Surface')
 
     ax.text(0.12, .27, 'Surface', size=10, ha='left', va='bottom', color=dark_color, transform=ax.transAxes)
     ax.axvline(np.log10(interp_atm_to_pressure(atm_true, sp, 1e-3*1e6)), lw=2, c=light_color, ls=':')
@@ -861,9 +902,9 @@ def abundances_plot():
     ax = ax.twinx()
     ax.set_yticks([])
     ax.plot([],[],c='k',lw=3, label='Posterior')
-    ax.plot([],[],c='k',lw=1, label='Prior')
+    # ax.plot([],[],c='k',lw=1, label='Prior')
     ax.plot([],[],c='k',lw=2, ls=':', label='Truth')
-    ax.legend(ncol=3,bbox_to_anchor=(0.5, 1.02), loc='lower center',fontsize=15)
+    # ax.legend(ncol=3,bbox_to_anchor=(0.5, 1.02), loc='lower center',fontsize=15)
 
 
     plt.savefig('figures/abundances.pdf',bbox_inches='tight')
@@ -888,12 +929,12 @@ def plotting_data():
 
 def main():
     # plotting_data()
-    # nominal_archean_plot()
+    nominal_archean_plot()
     # archean_corner_plot()
     # archean_corner_flux_plot()
     # methane_flux_plot()
     # methane_flux_muscles_plot()
-    abundances_plot()
+    # abundances_plot()
 
 if __name__ == '__main__':
     main()
