@@ -945,13 +945,13 @@ def plotting_data():
         pickle.dump(out, f)
 
 def main():
-    # plotting_data()
+    plotting_data()
     nominal_archean_plot()
-    # archean_corner_plot()
-    # archean_corner_flux_plot()
-    # methane_flux_plot()
-    # methane_flux_muscles_plot()
-    # abundances_plot()
+    archean_corner_plot()
+    archean_corner_flux_plot()
+    methane_flux_plot()
+    methane_flux_muscles_plot()
+    abundances_plot()
 
 if __name__ == '__main__':
     main()

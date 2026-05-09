@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - bokeh
 dependencies:
+  - python=3.11
   - numba=0.60.0
   - numpy=1.26.4
   - scipy=1.11.4
