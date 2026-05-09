@@ -3,6 +3,7 @@ warnings.filterwarnings('ignore')
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.lines import Line2D
 from photochem._clima import rebin_with_errors
 from copy import deepcopy
 import dill as pickle
@@ -234,7 +235,7 @@ def nominal_archean_plot():
     ax.text(1.3e-1, 3e-2, 'N$_2$', size=13, ha='left', va='bottom', color='C6')
     ax.text(1.1e-3, 1e-6, 'O$_2$', size=13, ha='left', va='bottom', color='C5')
     ax.text(6e-2, 1e-6, 'CO', size=13, ha='left', va='bottom', color='C4')
-    ax.text(3e-6, 1e-6, 'H$_2$', size=13, ha='left', va='bottom', color='C3')
+    ax.text(2e-5, 1e-6, 'H$_2$', size=13, ha='left', va='bottom', color='C3')
     ax.text(3e-4, 5e-3, 'CH$_4$', size=13, ha='left', va='bottom', color='C1')
 
     ax.set_xscale('log')
@@ -283,7 +284,23 @@ def nominal_archean_plot():
     ax.errorbar(wv, rprs2*1e6, yerr=err*1e6, xerr=wv_err, elinewidth=0.7, marker='o', ms=3, capsize=2, ls='', c='k',
                 label='',zorder=500)
 
-    ax.legend(ncol=10,bbox_to_anchor=(0.5, -0.02), loc='lower center',fontsize=10.5, labelcolor='linecolor', handlelength=0, handletextpad=-1.2, frameon=False)
+    legend_labels = labels + ['Clouds', 'Rayleigh & CIA']
+    legend_colors = colors + ['C5', '0.3']
+    handles = [Line2D([], [], linestyle='none') for _ in legend_labels]
+    leg = ax.legend(
+        handles=handles,
+        labels=legend_labels,
+        ncol=10,
+        bbox_to_anchor=(0.5, -0.02),
+        loc='lower center',
+        fontsize=10.5,
+        handlelength=0,
+        handletextpad=0,
+        columnspacing=0.6,
+        frameon=False,
+    )
+    for txt, color in zip(leg.get_texts(), legend_colors):
+        txt.set_color(color)
     ax.set_xlim(np.min(wavl),np.max(wavl))
     ax.set_ylim(4895, 5187)
     ax.set_ylabel('Transit Depth (ppm)')

@@ -59,10 +59,10 @@ PRESS, TEMP, MIX, GRIDINTERPOLATOR = make_climate_interpolators()
 PHOTOCHEMICAL_MODEL = make_photochemical_model('inputs/TRAPPIST1e_hazmat.txt')
 PHOTOCHEMICAL_MODEL_MUSCLES = make_photochemical_model('inputs/TRAPPIST1e_muscles.txt')
 
-def _model_setup(x, pc):
+def _model_setup(x, pc, log10Kzz=5.0):
 
     log10PN2 = 0.0
-    log10Kzz = 5.0
+    # log10Kzz = 5.0
 
     # Parameters
     species_var = ['CO2','O2','CO','H2','CH4']
